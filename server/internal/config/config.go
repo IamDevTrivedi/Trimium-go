@@ -11,8 +11,12 @@ import (
 )
 
 type Config struct {
-	Port   int
-	AppEnv string
+	Port         int
+	AppEnv       string
+	SMTPHost     string
+	SMTPPort     int
+	SMTPUsername string
+	SMTPPassword string
 }
 
 var (
@@ -44,7 +48,24 @@ func load() (*Config, error) {
 		return nil, err
 	}
 
-	return &Config{Port: port, AppEnv: appEnv}, nil
+	smtpHost, err := loadSMTPHost()
+	if err != nil {
+		return nil, err
+	}
+
+	smtpPort, err := loadSMTPPort()
+	if err != nil {
+		return nil, err
+	}
+
+	return &Config{
+		Port:         port,
+		AppEnv:       appEnv,
+		SMTPHost:     smtpHost,
+		SMTPPort:     smtpPort,
+		SMTPUsername: os.Getenv("SMTP_USERNAME"),
+		SMTPPassword: os.Getenv("SMTP_PASSWORD"),
+	}, nil
 }
 
 func loadAppEnv() (string, error) {
@@ -81,6 +102,28 @@ func loadPort() (int, error) {
 	}
 	if port < 1 || port > 65535 {
 		return 0, fmt.Errorf("invalid PORT %d: out of range 1-65535", port)
+	}
+
+	return port, nil
+}
+
+func loadSMTPHost() (string, error) {
+	host := os.Getenv("SMTP_HOST")
+	if host == "" {
+		return "", errors.New("missing SMTP_HOST")
+	}
+	return host, nil
+}
+
+func loadSMTPPort() (int, error) {
+	raw := os.Getenv("SMTP_PORT")
+
+	port, err := strconv.Atoi(raw)
+	if err != nil {
+		return 0, fmt.Errorf("invalid SMTP_PORT %q: not a number", raw)
+	}
+	if port < 1 || port > 65535 {
+		return 0, fmt.Errorf("invalid SMTP_PORT %d: out of range 1-65535", port)
 	}
 
 	return port, nil
