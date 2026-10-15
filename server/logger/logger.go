@@ -3,17 +3,13 @@ package logger
 import (
 	"log/slog"
 	"os"
-	"sync"
 )
 
-var (
-	instance *slog.Logger
-	once     sync.Once
-)
+var instance *slog.Logger
 
 func Get() *slog.Logger {
-	once.Do(func() {
+	if instance == nil {
 		instance = slog.New(slog.NewJSONHandler(os.Stdout, nil))
-	})
+	}
 	return instance
 }
