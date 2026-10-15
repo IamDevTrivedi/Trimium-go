@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"server/config"
+	"server/logger"
 )
 
 func main() {
@@ -14,5 +15,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Println("HELLO MITRO")
+	logger := logger.Get()
+	logger.Info("Environment is valid")
 }
