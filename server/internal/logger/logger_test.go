@@ -1,7 +1,7 @@
 package logger_test
 
 import (
-	"server/logger"
+	"server/internal/logger"
 	"testing"
 )
 

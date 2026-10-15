@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
-	"server/config"
-	"server/logger"
+	"server/internal/config"
+	"server/internal/logger"
 )
 
 func main() {
