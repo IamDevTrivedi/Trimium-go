@@ -28,7 +28,7 @@ func Get() *Client {
 		cfg, _ := config.Get()
 
 		SMTPUsername := cfg.SMTPUsername
-		SMTPPassword := cfg.SMTPUsername
+		SMTPPassword := cfg.SMTPPassword
 		SMTPPort := cfg.SMTPPort
 		SMTPHost := cfg.SMTPHost
 
