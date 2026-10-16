@@ -1,4 +1,4 @@
-.PHONY: build test run up down fmt fmt-check
+.PHONY: build test run up down fmt fmt-check run-build
 
 build:
 	go build -o bin/api ./cmd/api
@@ -8,6 +8,9 @@ test:
 
 run:
 	APP_ENV=development go run ./cmd/api
+
+run-build: 
+	APP_ENV=production ./bin/api
 
 up:
 	docker compose -f docker-compose.dev.yml up -d
