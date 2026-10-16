@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net/mail"
 	"os"
 	"strconv"
 
@@ -17,6 +18,7 @@ type Config struct {
 	SMTPPort     int
 	SMTPUsername string
 	SMTPPassword string
+	FromEmail    string
 }
 
 var (
@@ -58,6 +60,11 @@ func load() (*Config, error) {
 		return nil, err
 	}
 
+	fromEmail, err := loadFromEmail()
+	if err != nil {
+		return nil, err
+	}
+
 	return &Config{
 		Port:         port,
 		AppEnv:       appEnv,
@@ -65,6 +72,7 @@ func load() (*Config, error) {
 		SMTPPort:     smtpPort,
 		SMTPUsername: os.Getenv("SMTP_USERNAME"),
 		SMTPPassword: os.Getenv("SMTP_PASSWORD"),
+		FromEmail:    fromEmail,
 	}, nil
 }
 
@@ -127,4 +135,18 @@ func loadSMTPPort() (int, error) {
 	}
 
 	return port, nil
+}
+
+func loadFromEmail() (string, error) {
+	raw := os.Getenv("FROM_EMAIL")
+	if raw == "" {
+		return "", errors.New("missing FROM_EMAIL")
+	}
+
+	addr, err := mail.ParseAddress(raw)
+	if err != nil {
+		return "", fmt.Errorf("invalid FROM_EMAIL %q: %w", raw, err)
+	}
+
+	return addr.Address, nil
 }

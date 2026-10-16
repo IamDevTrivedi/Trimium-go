@@ -142,6 +142,38 @@ func TestLoadSMTPPort(t *testing.T) {
 	}
 }
 
+func TestLoadFromEmail(t *testing.T) {
+	tests := []struct {
+		name      string
+		emailVal  string
+		wantEmail string
+		expectErr bool
+	}{
+		{"valid email", "user@example.com", "user@example.com", false},
+		{"valid formatted email", "Sender Name <user@example.com>", "user@example.com", false},
+		{"invalid syntax plain text", "GEMINI is ASSHOLE", "", true},
+		{"invalid missing at sign", "userexample.com", "", true},
+		{"empty email", "", "", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("FROM_EMAIL", tt.emailVal)
+
+			got, err := loadFromEmail()
+			if tt.expectErr && err == nil {
+				t.Fatalf("expected error, got nil")
+			}
+			if !tt.expectErr && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tt.wantEmail {
+				t.Errorf("got %q, want %q", got, tt.wantEmail)
+			}
+		})
+	}
+}
+
 func TestLoadEnvFile(t *testing.T) {
 	t.Run("production allows missing env file", func(t *testing.T) {
 		err := loadEnvFile("production")
@@ -185,6 +217,7 @@ func TestGet(t *testing.T) {
 		t.Setenv("SMTP_PORT", "2525")
 		t.Setenv("SMTP_USERNAME", "testuser")
 		t.Setenv("SMTP_PASSWORD", "testpass")
+		t.Setenv("FROM_EMAIL", "noreply@example.com")
 
 		cfg1, err := Get()
 		if err != nil {
@@ -210,6 +243,9 @@ func TestGet(t *testing.T) {
 		}
 		if cfg1.SMTPPassword != "testpass" {
 			t.Errorf("got smtpPassword %q, want testpass", cfg1.SMTPPassword)
+		}
+		if cfg1.FromEmail != "noreply@example.com" {
+			t.Errorf("got fromEmail %q, want noreply@example.com", cfg1.FromEmail)
 		}
 
 		// Subsequent call returns cached instance even if environment changes
