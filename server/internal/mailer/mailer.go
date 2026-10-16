@@ -1,20 +1,19 @@
 package mailer
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"mime"
 	"net/mail"
-	"net/smtp"
 	"server/internal/config"
-	"strconv"
 	"strings"
 	"sync"
+
+	gomail "github.com/wneessen/go-mail"
 )
 
 type Client struct {
-	addr string
-	auth smtp.Auth
+	client *gomail.Client
 }
 
 var (
@@ -24,22 +23,32 @@ var (
 
 func Get() *Client {
 	once.Do(func() {
-
 		cfg, _ := config.Get()
 
-		SMTPUsername := cfg.SMTPUsername
-		SMTPPassword := cfg.SMTPPassword
-		SMTPPort := cfg.SMTPPort
-		SMTPHost := cfg.SMTPHost
+		host := cfg.SMTPHost
+		port := cfg.SMTPPort
+		username := cfg.SMTPUsername
+		password := cfg.SMTPPassword
 
-		var auth smtp.Auth
-		if SMTPUsername != "" {
-			auth = smtp.PlainAuth("", SMTPUsername, SMTPPassword, SMTPHost)
+		opts := []gomail.Option{
+			gomail.WithPort(port),
+			gomail.WithTLSPolicy(gomail.TLSOpportunistic),
 		}
-		instance = &Client{
-			addr: SMTPHost + ":" + strconv.Itoa(SMTPPort),
-			auth: auth,
+
+		if username != "" {
+			opts = append(opts,
+				gomail.WithSMTPAuth(gomail.SMTPAuthPlain),
+				gomail.WithUsername(username),
+				gomail.WithPassword(password),
+			)
 		}
+
+		c, err := gomail.NewClient(host, opts...)
+		if err != nil {
+			panic(fmt.Sprintf("mailer: failed to create client: %v", err))
+		}
+
+		instance = &Client{client: c}
 	})
 	return instance
 }
@@ -67,14 +76,31 @@ func (c *Client) Send(from string, to []string, subject, htmlBody string) error 
 		return errors.New("mailer: subject must not contain line breaks")
 	}
 
-	var msg strings.Builder
-	fmt.Fprintf(&msg, "From: %s\r\n", sender.String())
-	fmt.Fprintf(&msg, "To: %s\r\n", strings.Join(rcpts, ", "))
-	fmt.Fprintf(&msg, "Subject: %s\r\n", mime.QEncoding.Encode("utf-8", subject))
-	msg.WriteString("MIME-Version: 1.0\r\n")
-	msg.WriteString("Content-Type: text/html; charset=\"UTF-8\"\r\n")
-	msg.WriteString("\r\n")
-	msg.WriteString(htmlBody)
+	msg := gomail.NewMsg()
+	if err := msg.From(sender.Address); err != nil {
+		return fmt.Errorf("mailer: invalid from address: %w", err)
+	}
 
-	return smtp.SendMail(c.addr, c.auth, sender.Address, rcpts, []byte(msg.String()))
+	if err := msg.To(rcpts...); err != nil {
+		return fmt.Errorf("mailer: invalid to address: %w", err)
+	}
+
+	msg.Subject(subject)
+	msg.SetBodyString(gomail.TypeTextHTML, htmlBody)
+
+	if err := c.client.DialAndSend(msg); err != nil {
+		return fmt.Errorf("mailer: send failed: %w", err)
+	}
+
+	return nil
+}
+
+func (c *Client) Verify(ctx context.Context) error {
+	if err := c.client.DialWithContext(ctx); err != nil {
+		return fmt.Errorf("mailer: dial/auth failed: %w", err)
+	}
+	defer func() {
+		_ = c.client.Close()
+	}()
+	return nil
 }
