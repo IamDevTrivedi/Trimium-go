@@ -19,6 +19,8 @@ type Config struct {
 	SMTPUsername string
 	SMTPPassword string
 	FromEmail    string
+	BackendURL   string
+	FrontendURL  string
 }
 
 var (
@@ -65,6 +67,17 @@ func load() (*Config, error) {
 		return nil, err
 	}
 
+	var BackendURL string
+	var FrontendURL string
+
+	if appEnv == "development" {
+		BackendURL = os.Getenv("BACKEND_URL_DEV")
+		FrontendURL = os.Getenv("FRONTEND_URL_DEV")
+	} else {
+		BackendURL = os.Getenv("BACKEND_URL_PROD")
+		FrontendURL = os.Getenv("FRONTEND_URL_PROD")
+	}
+
 	return &Config{
 		Port:         port,
 		AppEnv:       appEnv,
@@ -73,6 +86,8 @@ func load() (*Config, error) {
 		SMTPUsername: os.Getenv("SMTP_USERNAME"),
 		SMTPPassword: os.Getenv("SMTP_PASSWORD"),
 		FromEmail:    fromEmail,
+		BackendURL:   BackendURL,
+		FrontendURL:  FrontendURL,
 	}, nil
 }
 

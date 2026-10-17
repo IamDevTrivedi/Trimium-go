@@ -1,6 +1,7 @@
 package config
 
 import (
+	"os"
 	"testing"
 )
 
@@ -218,6 +219,8 @@ func TestGet(t *testing.T) {
 		t.Setenv("SMTP_USERNAME", "testuser")
 		t.Setenv("SMTP_PASSWORD", "testpass")
 		t.Setenv("FROM_EMAIL", "noreply@example.com")
+		t.Setenv("BACKEND_URL_PROD", "https://api.trimium.example.com")
+		t.Setenv("FRONTEND_URL_PROD", "https://trimium.example.com")
 
 		cfg1, err := Get()
 		if err != nil {
@@ -247,6 +250,12 @@ func TestGet(t *testing.T) {
 		if cfg1.FromEmail != "noreply@example.com" {
 			t.Errorf("got fromEmail %q, want noreply@example.com", cfg1.FromEmail)
 		}
+		if cfg1.BackendURL != "https://api.trimium.example.com" {
+			t.Errorf("got backendURL %q, want https://api.trimium.example.com", cfg1.BackendURL)
+		}
+		if cfg1.FrontendURL != "https://trimium.example.com" {
+			t.Errorf("got frontendURL %q, want https://trimium.example.com", cfg1.FrontendURL)
+		}
 
 		// Subsequent call returns cached instance even if environment changes
 		t.Setenv("PORT", "9000")
@@ -263,6 +272,61 @@ func TestGet(t *testing.T) {
 		}
 		if cfg2.SMTPPort != 2525 {
 			t.Errorf("expected cached smtpPort 2525, got %d", cfg2.SMTPPort)
+		}
+	})
+
+	t.Run("development environment selects dev URLs", func(t *testing.T) {
+		resetState()
+		if err := os.WriteFile(".env.development", []byte(""), 0600); err != nil {
+			t.Fatalf("failed to create temp .env.development: %v", err)
+		}
+		t.Cleanup(func() {
+			os.Remove(".env.development")
+		})
+
+		t.Setenv("APP_ENV", "development")
+		t.Setenv("PORT", "5000")
+		t.Setenv("SMTP_HOST", "localhost")
+		t.Setenv("SMTP_PORT", "5003")
+		t.Setenv("FROM_EMAIL", "trimium@localhost")
+		t.Setenv("BACKEND_URL_DEV", "http://localhost:5000")
+		t.Setenv("FRONTEND_URL_DEV", "http://localhost:3000")
+		t.Setenv("BACKEND_URL_PROD", "https://api.trimium.trivedi.dev")
+		t.Setenv("FRONTEND_URL_PROD", "https://trimium.vercel.app")
+
+		cfg, err := Get()
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if cfg.BackendURL != "http://localhost:5000" {
+			t.Errorf("got backendURL %q, want http://localhost:5000", cfg.BackendURL)
+		}
+		if cfg.FrontendURL != "http://localhost:3000" {
+			t.Errorf("got frontendURL %q, want http://localhost:3000", cfg.FrontendURL)
+		}
+	})
+
+	t.Run("production environment selects prod URLs over dev URLs", func(t *testing.T) {
+		resetState()
+		t.Setenv("APP_ENV", "production")
+		t.Setenv("PORT", "5000")
+		t.Setenv("SMTP_HOST", "smtp.example.com")
+		t.Setenv("SMTP_PORT", "587")
+		t.Setenv("FROM_EMAIL", "admin@example.com")
+		t.Setenv("BACKEND_URL_DEV", "http://localhost:5000")
+		t.Setenv("FRONTEND_URL_DEV", "http://localhost:3000")
+		t.Setenv("BACKEND_URL_PROD", "https://api.trimium.trivedi.dev")
+		t.Setenv("FRONTEND_URL_PROD", "https://trimium.vercel.app")
+
+		cfg, err := Get()
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if cfg.BackendURL != "https://api.trimium.trivedi.dev" {
+			t.Errorf("got backendURL %q, want https://api.trimium.trivedi.dev", cfg.BackendURL)
+		}
+		if cfg.FrontendURL != "https://trimium.vercel.app" {
+			t.Errorf("got frontendURL %q, want https://trimium.vercel.app", cfg.FrontendURL)
 		}
 	})
 }
