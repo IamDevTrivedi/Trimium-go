@@ -12,6 +12,9 @@ run:
 run-build: 
 	APP_ENV=production ./bin/api
 
+dev:
+	air
+
 up:
 	docker compose -f docker-compose.dev.yml up -d
 
@@ -26,3 +29,6 @@ fmt-check:
 
 fmt:
 	gofmt -w .
+
+setup: 
+	go install github.com/cosmtrek/air@latest
