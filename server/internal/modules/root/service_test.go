@@ -13,19 +13,21 @@ func TestNewService(t *testing.T) {
 
 func TestService_GetStatus(t *testing.T) {
 	svc := NewService()
-	status := svc.GetStatus()
 
-	if status == nil {
-		t.Fatal("expected GetStatus() to return non-nil map")
+	data, err := svc.GetStatus()
+	if err != nil {
+		t.Fatalf("expected GetStatus() to return nil error, got %v", err)
 	}
 
-	expectedMessage := "Welcome to Trimium API"
-	if msg, ok := status["message"]; !ok || msg != expectedMessage {
-		t.Errorf("expected message %q, got %v", expectedMessage, msg)
+	// The service is currently a placeholder that returns no payload;
+	// the welcome message is owned by the handler. Update this test
+	// once GetStatus starts returning real status data.
+	if data != nil {
+		t.Errorf("expected GetStatus() to return nil payload, got %v", data)
 	}
 
-	expectedStatus := "ok"
-	if st, ok := status["status"]; !ok || st != expectedStatus {
-		t.Errorf("expected status %q, got %v", expectedStatus, st)
+	// Calling twice must not introduce state or fail.
+	if _, err := svc.GetStatus(); err != nil {
+		t.Errorf("expected second GetStatus() call to return nil error, got %v", err)
 	}
 }

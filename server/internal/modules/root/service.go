@@ -1,7 +1,7 @@
 package root
 
 type Service interface {
-	GetStatus() map[string]any
+	GetStatus() (map[string]any, error)
 }
 
 type service struct{}
@@ -10,9 +10,6 @@ func NewService() Service {
 	return &service{}
 }
 
-func (s *service) GetStatus() map[string]any {
-	return map[string]any{
-		"message": "Welcome to Trimium API",
-		"success": true,
-	}
+func (s *service) GetStatus() (map[string]any, error) {
+	return nil, nil
 }

@@ -1,9 +1,9 @@
 package root
 
 import (
-	"net/http"
-
 	"github.com/gin-gonic/gin"
+
+	"server/internal/response"
 )
 
 type Handler struct {
@@ -15,6 +15,12 @@ func NewHandler(s Service) *Handler {
 }
 
 func (h *Handler) HandleRoot(c *gin.Context) {
-	data := h.service.GetStatus()
-	c.JSON(http.StatusOK, data)
+	data, err := h.service.GetStatus()
+
+	if err != nil {
+		response.Error(c, 500, err.Error())
+		return
+	}
+
+	response.Success(c, "Welcome to Trimium API", data)
 }

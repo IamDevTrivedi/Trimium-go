@@ -2,70 +2,118 @@ package root
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"reflect"
 	"testing"
 
 	"github.com/gin-gonic/gin"
+
+	"server/internal/response"
 )
 
-type mockRootService struct {
-	mockStatus map[string]any
+var _ Service = (*mockService)(nil)
+
+type mockService struct {
+	data map[string]any
+	err  error
 }
 
-func (m *mockRootService) GetStatus() map[string]any {
-	return m.mockStatus
+func (m *mockService) GetStatus() (map[string]any, error) {
+	return m.data, m.err
+}
+
+func TestMain(m *testing.M) {
+	gin.SetMode(gin.TestMode)
+	os.Exit(m.Run())
 }
 
 func TestHandler_HandleRoot(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
 	tests := []struct {
 		name         string
-		mockData     map[string]any
-		expectedCode int
+		data         map[string]any
+		err          error
+		wantStatus   int
+		wantSuccess  bool
+		wantMsg      string
+		wantMetadata any
 	}{
 		{
-			name: "returns status 200 with service payload",
-			mockData: map[string]any{
-				"message": "Custom Welcome Message",
-				"status":  "healthy",
-			},
-			expectedCode: http.StatusOK,
+			name:         "returns success envelope with service payload",
+			data:         map[string]any{"message": "Custom Welcome Message", "status": "healthy"},
+			wantStatus:   http.StatusOK,
+			wantSuccess:  true,
+			wantMsg:      "Welcome to Trimium API",
+			wantMetadata: map[string]any{"message": "Custom Welcome Message", "status": "healthy"},
+		},
+		{
+			name:         "nil payload is serialized with null metadata",
+			data:         nil,
+			wantStatus:   http.StatusOK,
+			wantSuccess:  true,
+			wantMsg:      "Welcome to Trimium API",
+			wantMetadata: nil,
+		},
+		{
+			name:         "service error returns error envelope",
+			data:         nil,
+			err:          errors.New("failed to load status"),
+			wantStatus:   http.StatusInternalServerError,
+			wantSuccess:  false,
+			wantMsg:      "failed to load status",
+			wantMetadata: nil,
 		},
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			mockSvc := &mockRootService{mockStatus: tc.mockData}
-			h := NewHandler(mockSvc)
-
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 			router := gin.New()
-			RegisterRoutes(router, h)
+			RegisterRoutes(router, NewHandler(&mockService{data: tt.data, err: tt.err}))
 
-			req, err := http.NewRequest(http.MethodGet, "/", nil)
-			if err != nil {
-				t.Fatalf("failed to create request: %v", err)
-			}
-
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
 			w := httptest.NewRecorder()
 			router.ServeHTTP(w, req)
 
-			if w.Code != tc.expectedCode {
-				t.Fatalf("expected status %d, got %d", tc.expectedCode, w.Code)
+			if w.Code != tt.wantStatus {
+				t.Fatalf("expected status %d, got %d", tt.wantStatus, w.Code)
 			}
 
-			var body map[string]any
-			if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+			if ct := w.Header().Get("Content-Type"); ct != "application/json; charset=utf-8" {
+				t.Errorf("expected Content-Type %q, got %q", "application/json; charset=utf-8", ct)
+			}
+
+			var got response.Response
+			if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
 				t.Fatalf("failed to parse response JSON: %v", err)
 			}
 
-			if body["message"] != tc.mockData["message"] {
-				t.Errorf("expected message %v, got %v", tc.mockData["message"], body["message"])
+			if got.Success != tt.wantSuccess {
+				t.Errorf("expected success %v, got %v", tt.wantSuccess, got.Success)
 			}
-			if body["status"] != tc.mockData["status"] {
-				t.Errorf("expected status %v, got %v", tc.mockData["status"], body["status"])
+			if got.Msg != tt.wantMsg {
+				t.Errorf("expected msg %q, got %q", tt.wantMsg, got.Msg)
+			}
+			if got.Timestamp <= 0 {
+				t.Errorf("expected positive timestamp, got %d", got.Timestamp)
+			}
+			if !reflect.DeepEqual(got.Metadata, tt.wantMetadata) {
+				t.Errorf("expected metadata %v, got %v", tt.wantMetadata, got.Metadata)
 			}
 		})
+	}
+}
+
+func TestRegisterRoutes_OnlyRootPathIsRegistered(t *testing.T) {
+	router := gin.New()
+	RegisterRoutes(router, NewHandler(&mockService{}))
+
+	routes := router.Routes()
+	if len(routes) != 1 {
+		t.Fatalf("expected 1 registered route, got %d", len(routes))
+	}
+	if routes[0].Method != http.MethodGet || routes[0].Path != "/" {
+		t.Errorf("expected GET /, got %s %s", routes[0].Method, routes[0].Path)
 	}
 }
