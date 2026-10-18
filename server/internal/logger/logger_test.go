@@ -1,8 +1,9 @@
 package logger_test
 
 import (
-	"server/internal/logger"
 	"testing"
+
+	"server/internal/logger"
 )
 
 func TestGet(t *testing.T) {

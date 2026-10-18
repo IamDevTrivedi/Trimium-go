@@ -72,7 +72,7 @@ func TestHandler_HandleRoot(t *testing.T) {
 			router := gin.New()
 			RegisterRoutes(router, NewHandler(&mockService{data: tt.data, err: tt.err}))
 
-			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 			w := httptest.NewRecorder()
 			router.ServeHTTP(w, req)
 

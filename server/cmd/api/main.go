@@ -21,12 +21,16 @@ import (
 )
 
 func main() {
+	if err := run(); err != nil {
+		fmt.Fprintf(os.Stderr, "fatal: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
 	cfg, err := config.Get()
 	if err != nil {
-		fmt.Printf("config error: %v\n", err)
-		os.Exit(1)
-	} else {
-		fmt.Println(cfg)
+		return fmt.Errorf("config error: %w", err)
 	}
 
 	log := logger.Get()
@@ -35,10 +39,8 @@ func main() {
 	emailCtx, emailCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer emailCancel()
 
-	err = mailer.Get().Verify(emailCtx)
-	if err != nil {
-		log.Error(fmt.Sprintf("Mailer verification failed: %v", err))
-		os.Exit(1)
+	if err := mailer.Get().Verify(emailCtx); err != nil {
+		return fmt.Errorf("mailer verification failed: %w", err)
 	}
 
 	log.Info("Mailer verification succeeded")
@@ -59,21 +61,27 @@ func main() {
 	health.RegisterRoutes(router, healthHandler)
 
 	srv := &http.Server{
-		Addr:    fmt.Sprintf(":%d", cfg.Port),
-		Handler: router,
+		Addr:              fmt.Sprintf(":%d", cfg.Port),
+		Handler:           router,
+		ReadHeaderTimeout: 10 * time.Second,
 	}
 
+	serverErr := make(chan error, 1)
 	go func() {
 		log.Info(fmt.Sprintf("Server listening on port %d", cfg.Port))
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Error(fmt.Sprintf("Server failed to start: %v", err))
-			os.Exit(1)
+			serverErr <- fmt.Errorf("server failed to start: %w", err)
 		}
 	}()
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
+
+	select {
+	case err := <-serverErr:
+		return err
+	case <-quit:
+	}
 
 	log.Info("Shutting down server...")
 
@@ -81,8 +89,10 @@ func main() {
 	defer shutdownCancel()
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
-		log.Error(fmt.Sprintf("Server forced to shutdown: %v", err))
+		return fmt.Errorf("server forced to shutdown: %w", err)
 	}
 
 	log.Info("Server stopped cleanly")
+
+	return nil
 }

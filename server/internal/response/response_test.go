@@ -1,6 +1,7 @@
 package response
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -24,7 +25,7 @@ func serve(write func(c *gin.Context)) *httptest.ResponseRecorder {
 	router.GET("/test", write)
 
 	w := httptest.NewRecorder()
-	router.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/test", nil))
+	router.ServeHTTP(w, httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/test", nil))
 	return w
 }
 

@@ -5,11 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"net/mail"
-	"server/internal/config"
 	"strings"
 	"sync"
 
 	gomail "github.com/wneessen/go-mail"
+
+	"server/internal/config"
 )
 
 type Client struct {

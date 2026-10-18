@@ -53,7 +53,7 @@ func TestRequestLogger_LogsRequestMetadata(t *testing.T) {
 		c.JSON(http.StatusOK, gin.H{"ok": true})
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/test?foo=bar&baz=1", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/test?foo=bar&baz=1", nil)
 	req.Header.Set("User-Agent", "test-agent/1.0")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -127,7 +127,7 @@ func TestRequestLogger_LevelByStatus(t *testing.T) {
 			})
 
 			w := httptest.NewRecorder()
-			router.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/test", nil))
+			router.ServeHTTP(w, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/test", nil))
 
 			entries := parseLogEntries(t, &buf)
 			if len(entries) != 1 {
@@ -159,10 +159,10 @@ func TestRequestLogger_LevelByStatus(t *testing.T) {
 
 func TestRequestLogger_UnsetStatusDefaultsTo200(t *testing.T) {
 	var buf bytes.Buffer
-	router := newTestRouter(&buf, func(c *gin.Context) {})
+	router := newTestRouter(&buf, func(_ *gin.Context) {})
 
 	w := httptest.NewRecorder()
-	router.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/test", nil))
+	router.ServeHTTP(w, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/test", nil))
 
 	entries := parseLogEntries(t, &buf)
 	if len(entries) != 1 {

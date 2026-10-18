@@ -21,12 +21,17 @@ func resetState() {
 func startMockSMTPServer(t *testing.T) (string, int, func()) {
 	t.Helper()
 
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	var lc net.ListenConfig
+
+	ln, err := lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("failed to start mock SMTP listener: %v", err)
 	}
 
-	addr := ln.Addr().(*net.TCPAddr)
+	addr, ok := ln.Addr().(*net.TCPAddr)
+	if !ok {
+		t.Fatalf("expected TCP listener address, got %T", ln.Addr())
+	}
 	stop := make(chan struct{})
 
 	go func() {
