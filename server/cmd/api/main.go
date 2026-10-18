@@ -15,6 +15,7 @@ import (
 	"server/internal/config"
 	"server/internal/logger"
 	"server/internal/mailer"
+	"server/internal/middleware"
 	"server/internal/modules/health"
 	"server/internal/modules/root"
 )
@@ -46,7 +47,8 @@ func main() {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
-	router := gin.Default()
+	router := gin.New()
+	router.Use(middleware.RequestLogger(), gin.Recovery())
 
 	rootService := root.NewService()
 	rootHandler := root.NewHandler(rootService)
