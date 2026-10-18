@@ -15,6 +15,7 @@ import (
 	"server/internal/config"
 	"server/internal/logger"
 	"server/internal/mailer"
+	"server/internal/modules/health"
 	"server/internal/modules/root"
 )
 
@@ -50,6 +51,10 @@ func main() {
 	rootService := root.NewService()
 	rootHandler := root.NewHandler(rootService)
 	root.RegisterRoutes(router, rootHandler)
+
+	healthService := health.NewService()
+	healthHandler := health.NewHandler(healthService)
+	health.RegisterRoutes(router, healthHandler)
 
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%d", cfg.Port),
