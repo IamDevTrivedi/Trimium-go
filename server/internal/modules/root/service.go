@@ -13,6 +13,6 @@ func NewService() Service {
 func (s *service) GetStatus() map[string]any {
 	return map[string]any{
 		"message": "Welcome to Trimium API",
-		"status":  "ok",
+		"success": true,
 	}
 }
