@@ -22,6 +22,7 @@ type Config struct {
 	FromEmail    string
 	BackendURL   string
 	FrontendURL  string
+	GeoIPDBPath  string
 }
 
 var (
@@ -30,9 +31,6 @@ var (
 	once   sync.Once
 )
 
-// Get returns the singleton Config, loading it on first call.
-// Subsequent calls return the same instance (or the same error) without
-// re-reading the environment.
 func Get() (*Config, error) {
 	once.Do(func() {
 		cached, err = load()
@@ -65,20 +63,34 @@ func load() (*Config, error) {
 		return nil, err
 	}
 
+	smtpUsername, err := loadSMTPUsername()
+	if err != nil {
+		return nil, err
+	}
+
+	smtpPassword, err := loadSMTPPassword()
+	if err != nil {
+		return nil, err
+	}
+
 	fromEmail, err := loadFromEmail()
 	if err != nil {
 		return nil, err
 	}
 
-	var BackendURL string
-	var FrontendURL string
+	backendURL, err := loadBackendURL(appEnv)
+	if err != nil {
+		return nil, err
+	}
 
-	if appEnv == "development" {
-		BackendURL = os.Getenv("BACKEND_URL_DEV")
-		FrontendURL = os.Getenv("FRONTEND_URL_DEV")
-	} else {
-		BackendURL = os.Getenv("BACKEND_URL_PROD")
-		FrontendURL = os.Getenv("FRONTEND_URL_PROD")
+	frontendURL, err := loadFrontendURL(appEnv)
+	if err != nil {
+		return nil, err
+	}
+
+	geoIPDBPath, err := loadGeoIPDBPath()
+	if err != nil {
+		return nil, err
 	}
 
 	return &Config{
@@ -86,12 +98,35 @@ func load() (*Config, error) {
 		AppEnv:       appEnv,
 		SMTPHost:     smtpHost,
 		SMTPPort:     smtpPort,
-		SMTPUsername: os.Getenv("SMTP_USERNAME"),
-		SMTPPassword: os.Getenv("SMTP_PASSWORD"),
+		SMTPUsername: smtpUsername,
+		SMTPPassword: smtpPassword,
 		FromEmail:    fromEmail,
-		BackendURL:   BackendURL,
-		FrontendURL:  FrontendURL,
+		BackendURL:   backendURL,
+		FrontendURL:  frontendURL,
+		GeoIPDBPath:  geoIPDBPath,
 	}, nil
+}
+
+func requireString(key string) (string, error) {
+	val := os.Getenv(key)
+	if val == "" {
+		return "", fmt.Errorf("missing %s", key)
+	}
+	return val, nil
+}
+
+func requirePort(key string) (int, error) {
+	raw := os.Getenv(key)
+
+	port, err := strconv.Atoi(raw)
+	if err != nil {
+		return 0, fmt.Errorf("invalid %s %q: not a number", key, raw)
+	}
+	if port < 1 || port > 65535 {
+		return 0, fmt.Errorf("invalid %s %d: out of range 1-65535", key, port)
+	}
+
+	return port, nil
 }
 
 func loadAppEnv() (string, error) {
@@ -120,45 +155,29 @@ func loadEnvFile(appEnv string) error {
 }
 
 func loadPort() (int, error) {
-	raw := os.Getenv("PORT")
-
-	port, err := strconv.Atoi(raw)
-	if err != nil {
-		return 0, fmt.Errorf("invalid PORT %q: not a number", raw)
-	}
-	if port < 1 || port > 65535 {
-		return 0, fmt.Errorf("invalid PORT %d: out of range 1-65535", port)
-	}
-
-	return port, nil
+	return requirePort("PORT")
 }
 
 func loadSMTPHost() (string, error) {
-	host := os.Getenv("SMTP_HOST")
-	if host == "" {
-		return "", errors.New("missing SMTP_HOST")
-	}
-	return host, nil
+	return requireString("SMTP_HOST")
 }
 
 func loadSMTPPort() (int, error) {
-	raw := os.Getenv("SMTP_PORT")
+	return requirePort("SMTP_PORT")
+}
 
-	port, err := strconv.Atoi(raw)
-	if err != nil {
-		return 0, fmt.Errorf("invalid SMTP_PORT %q: not a number", raw)
-	}
-	if port < 1 || port > 65535 {
-		return 0, fmt.Errorf("invalid SMTP_PORT %d: out of range 1-65535", port)
-	}
+func loadSMTPUsername() (string, error) {
+	return requireString("SMTP_USERNAME")
+}
 
-	return port, nil
+func loadSMTPPassword() (string, error) {
+	return requireString("SMTP_PASSWORD")
 }
 
 func loadFromEmail() (string, error) {
-	raw := os.Getenv("FROM_EMAIL")
-	if raw == "" {
-		return "", errors.New("missing FROM_EMAIL")
+	raw, err := requireString("FROM_EMAIL")
+	if err != nil {
+		return "", err
 	}
 
 	addr, err := mail.ParseAddress(raw)
@@ -167,4 +186,24 @@ func loadFromEmail() (string, error) {
 	}
 
 	return addr.Address, nil
+}
+
+func loadBackendURL(appEnv string) (string, error) {
+	key := "BACKEND_URL_PROD"
+	if appEnv == "development" {
+		key = "BACKEND_URL_DEV"
+	}
+	return requireString(key)
+}
+
+func loadFrontendURL(appEnv string) (string, error) {
+	key := "FRONTEND_URL_PROD"
+	if appEnv == "development" {
+		key = "FRONTEND_URL_DEV"
+	}
+	return requireString(key)
+}
+
+func loadGeoIPDBPath() (string, error) {
+	return requireString("GEOIP_DB_PATH")
 }
