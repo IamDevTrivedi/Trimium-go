@@ -9,6 +9,8 @@ APP_NAME  := api
 BIN_DIR   := bin
 BIN       := $(BIN_DIR)/$(APP_NAME)
 CMD_PATH  := ./cmd/api
+GEOIP_CMD := ./cmd/geoipupdate
+GEOIP_DB  ?= ./data/geoip/GeoLite2-City.mmdb
 
 # Runtime environments
 DEV_ENV   ?= development
@@ -31,7 +33,8 @@ GO                    := go
         fmt fmt-check \
         lint lint-check \
         up down \
-        install-lint install-air
+        install-lint install-air \
+		geoip-update geoip-check
 
 # Help
 help: ## Show available targets
@@ -93,3 +96,11 @@ up: ## Start docker-compose development stack (detached)
 
 down: ## Stop docker-compose development stack
 	docker compose -f $(COMPOSE_FILE) down
+
+# GeoIP
+geoip-update: ## Download/refresh the GeoLite2-City database (needs MAXMIND_LICENSE_KEY)
+	@test -n "$${MAXMIND_LICENSE_KEY:-}" || { echo "MAXMIND_LICENSE_KEY is not set"; exit 1; }
+	GEOIP_DB_PATH=$(GEOIP_DB) $(GO) run $(GEOIP_CMD)
+
+geoip-check: ## Fail if the GeoIP database is missing
+	@test -f $(GEOIP_DB) || { echo "Missing $(GEOIP_DB). Run: make geoip-update"; exit 1; }
