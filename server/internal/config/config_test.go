@@ -2,12 +2,14 @@ package config
 
 import (
 	"os"
+	"sync"
 	"testing"
 )
 
 func resetState() {
 	cached = nil
 	err = nil
+	once = sync.Once{}
 }
 
 func TestLoadAppEnv(t *testing.T) {
@@ -143,6 +145,56 @@ func TestLoadSMTPPort(t *testing.T) {
 	}
 }
 
+func TestLoadSMTPUsername(t *testing.T) {
+	tests := []struct {
+		name  string
+		value string
+		want  string
+	}{
+		{"value set", "smtp-user", "smtp-user"},
+		{"empty allowed", "", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("SMTP_USERNAME", tt.value)
+
+			got, err := loadSMTPUsername()
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestLoadSMTPPassword(t *testing.T) {
+	tests := []struct {
+		name  string
+		value string
+		want  string
+	}{
+		{"value set", "smtp-pass", "smtp-pass"},
+		{"empty allowed", "", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("SMTP_PASSWORD", tt.value)
+
+			got, err := loadSMTPPassword()
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestLoadFromEmail(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -170,6 +222,105 @@ func TestLoadFromEmail(t *testing.T) {
 			}
 			if got != tt.wantEmail {
 				t.Errorf("got %q, want %q", got, tt.wantEmail)
+			}
+		})
+	}
+}
+
+func TestLoadBackendURL(t *testing.T) {
+	tests := []struct {
+		name      string
+		appEnv    string
+		devURL    string
+		prodURL   string
+		want      string
+		expectErr bool
+	}{
+		{"development uses dev URL", "development", "http://localhost:5000", "https://api.example.com", "http://localhost:5000", false},
+		{"production uses prod URL", "production", "http://localhost:5000", "https://api.example.com", "https://api.example.com", false},
+		{"test uses prod URL", "test", "http://localhost:5000", "https://api.example.com", "https://api.example.com", false},
+		{"development missing dev URL", "development", "", "https://api.example.com", "", true},
+		{"production missing prod URL", "production", "http://localhost:5000", "", "", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("BACKEND_URL_DEV", tt.devURL)
+			t.Setenv("BACKEND_URL_PROD", tt.prodURL)
+
+			got, err := loadBackendURL(tt.appEnv)
+			if tt.expectErr && err == nil {
+				t.Fatalf("expected error, got nil")
+			}
+			if !tt.expectErr && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestLoadFrontendURL(t *testing.T) {
+	tests := []struct {
+		name      string
+		appEnv    string
+		devURL    string
+		prodURL   string
+		want      string
+		expectErr bool
+	}{
+		{"development uses dev URL", "development", "http://localhost:3000", "https://trimium.example.com", "http://localhost:3000", false},
+		{"production uses prod URL", "production", "http://localhost:3000", "https://trimium.example.com", "https://trimium.example.com", false},
+		{"test uses prod URL", "test", "http://localhost:3000", "https://trimium.example.com", "https://trimium.example.com", false},
+		{"development missing dev URL", "development", "", "https://trimium.example.com", "", true},
+		{"production missing prod URL", "production", "http://localhost:3000", "", "", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("FRONTEND_URL_DEV", tt.devURL)
+			t.Setenv("FRONTEND_URL_PROD", tt.prodURL)
+
+			got, err := loadFrontendURL(tt.appEnv)
+			if tt.expectErr && err == nil {
+				t.Fatalf("expected error, got nil")
+			}
+			if !tt.expectErr && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestLoadGeoIPDBPath(t *testing.T) {
+	tests := []struct {
+		name      string
+		value     string
+		want      string
+		expectErr bool
+	}{
+		{"valid path", "./data/geoip/GeoLite2-City.mmdb", "./data/geoip/GeoLite2-City.mmdb", false},
+		{"empty path", "", "", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("GEOIP_DB_PATH", tt.value)
+
+			got, err := loadGeoIPDBPath()
+			if tt.expectErr && err == nil {
+				t.Fatalf("expected error, got nil")
+			}
+			if !tt.expectErr && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
 			}
 		})
 	}
@@ -221,6 +372,7 @@ func TestGet(t *testing.T) {
 		t.Setenv("FROM_EMAIL", "noreply@example.com")
 		t.Setenv("BACKEND_URL_PROD", "https://api.trimium.example.com")
 		t.Setenv("FRONTEND_URL_PROD", "https://trimium.example.com")
+		t.Setenv("GEOIP_DB_PATH", "./data/geoip/GeoLite2-City.mmdb")
 
 		cfg1, err := Get()
 		if err != nil {
@@ -255,6 +407,9 @@ func TestGet(t *testing.T) {
 		}
 		if cfg1.FrontendURL != "https://trimium.example.com" {
 			t.Errorf("got frontendURL %q, want https://trimium.example.com", cfg1.FrontendURL)
+		}
+		if cfg1.GeoIPDBPath != "./data/geoip/GeoLite2-City.mmdb" {
+			t.Errorf("got geoIPDBPath %q, want ./data/geoip/GeoLite2-City.mmdb", cfg1.GeoIPDBPath)
 		}
 
 		// Subsequent call returns cached instance even if environment changes
@@ -293,6 +448,7 @@ func TestGet(t *testing.T) {
 		t.Setenv("FRONTEND_URL_DEV", "http://localhost:3000")
 		t.Setenv("BACKEND_URL_PROD", "https://api.trimium.trivedi.dev")
 		t.Setenv("FRONTEND_URL_PROD", "https://trimium.vercel.app")
+		t.Setenv("GEOIP_DB_PATH", "./data/geoip/GeoLite2-City.mmdb")
 
 		cfg, err := Get()
 		if err != nil {
@@ -317,6 +473,7 @@ func TestGet(t *testing.T) {
 		t.Setenv("FRONTEND_URL_DEV", "http://localhost:3000")
 		t.Setenv("BACKEND_URL_PROD", "https://api.trimium.trivedi.dev")
 		t.Setenv("FRONTEND_URL_PROD", "https://trimium.vercel.app")
+		t.Setenv("GEOIP_DB_PATH", "./data/geoip/GeoLite2-City.mmdb")
 
 		cfg, err := Get()
 		if err != nil {

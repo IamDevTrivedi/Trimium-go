@@ -254,6 +254,7 @@ func TestGet(t *testing.T) {
 	t.Setenv("FROM_EMAIL", "trimium@localhost")
 	t.Setenv("BACKEND_URL_PROD", "https://api.example.com")
 	t.Setenv("FRONTEND_URL_PROD", "https://example.com")
+	t.Setenv("GEOIP_DB_PATH", "./data/geoip/GeoLite2-City.mmdb")
 
 	client1 := Get()
 	if client1 == nil {
