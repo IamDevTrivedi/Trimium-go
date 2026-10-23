@@ -8,21 +8,28 @@ import (
 	"os"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/joho/godotenv"
 )
 
 type Config struct {
-	Port         int
-	AppEnv       string
-	SMTPHost     string
-	SMTPPort     int
-	SMTPUsername string
-	SMTPPassword string
-	FromEmail    string
-	BackendURL   string
-	FrontendURL  string
-	GeoIPDBPath  string
+	Port                int
+	AppEnv              string
+	SMTPHost            string
+	SMTPPort            int
+	SMTPUsername        string
+	SMTPPassword        string
+	FromEmail           string
+	BackendURL          string
+	FrontendURL         string
+	GeoIPDBPath         string
+	MongoURI            string
+	MongoDatabase       string
+	MongoMaxPoolSize    uint64
+	MongoMinPoolSize    uint64
+	MongoConnectTimeout time.Duration
+	MongoPingTimeout    time.Duration
 }
 
 var (
@@ -93,17 +100,53 @@ func load() (*Config, error) {
 		return nil, err
 	}
 
+	mongoURI, err := loadMongoURI()
+	if err != nil {
+		return nil, err
+	}
+
+	mongoDatabase, err := loadMongoDatabase()
+	if err != nil {
+		return nil, err
+	}
+
+	mongoMaxPoolSize, err := loadMongoMaxPoolSize()
+	if err != nil {
+		return nil, err
+	}
+
+	mongoMinPoolSize, err := loadMongoMinPoolSize()
+	if err != nil {
+		return nil, err
+	}
+
+	mongoConnectTimeout, err := loadMongoConnectTimeout()
+	if err != nil {
+		return nil, err
+	}
+
+	mongoPingTimeout, err := loadMongoPingTimeout()
+	if err != nil {
+		return nil, err
+	}
+
 	return &Config{
-		Port:         port,
-		AppEnv:       appEnv,
-		SMTPHost:     smtpHost,
-		SMTPPort:     smtpPort,
-		SMTPUsername: smtpUsername,
-		SMTPPassword: smtpPassword,
-		FromEmail:    fromEmail,
-		BackendURL:   backendURL,
-		FrontendURL:  frontendURL,
-		GeoIPDBPath:  geoIPDBPath,
+		Port:                port,
+		AppEnv:              appEnv,
+		SMTPHost:            smtpHost,
+		SMTPPort:            smtpPort,
+		SMTPUsername:        smtpUsername,
+		SMTPPassword:        smtpPassword,
+		FromEmail:           fromEmail,
+		BackendURL:          backendURL,
+		FrontendURL:         frontendURL,
+		GeoIPDBPath:         geoIPDBPath,
+		MongoURI:            mongoURI,
+		MongoDatabase:       mongoDatabase,
+		MongoMaxPoolSize:    mongoMaxPoolSize,
+		MongoMinPoolSize:    mongoMinPoolSize,
+		MongoConnectTimeout: mongoConnectTimeout,
+		MongoPingTimeout:    mongoPingTimeout,
 	}, nil
 }
 
@@ -127,6 +170,37 @@ func requirePort(key string) (int, error) {
 	}
 
 	return port, nil
+}
+
+func requireUint64(key string) (uint64, error) {
+	raw := os.Getenv(key)
+	if raw == "" {
+		return 0, fmt.Errorf("missing %s", key)
+	}
+
+	val, err := strconv.ParseUint(raw, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid %s %q: not a non-negative integer", key, raw)
+	}
+
+	return val, nil
+}
+
+func requireDuration(key string) (time.Duration, error) {
+	raw := os.Getenv(key)
+	if raw == "" {
+		return 0, fmt.Errorf("missing %s", key)
+	}
+
+	val, err := time.ParseDuration(raw)
+	if err != nil {
+		return 0, fmt.Errorf("invalid %s %q: not a duration", key, raw)
+	}
+	if val <= 0 {
+		return 0, fmt.Errorf("invalid %s %q: must be greater than zero", key, raw)
+	}
+
+	return val, nil
 }
 
 func loadAppEnv() (string, error) {
@@ -206,4 +280,28 @@ func loadFrontendURL(appEnv string) (string, error) {
 
 func loadGeoIPDBPath() (string, error) {
 	return requireString("GEOIP_DB_PATH")
+}
+
+func loadMongoURI() (string, error) {
+	return requireString("MONGO_URI")
+}
+
+func loadMongoDatabase() (string, error) {
+	return requireString("MONGO_DB_NAME")
+}
+
+func loadMongoMaxPoolSize() (uint64, error) {
+	return requireUint64("MONGO_MAX_POOL_SIZE")
+}
+
+func loadMongoMinPoolSize() (uint64, error) {
+	return requireUint64("MONGO_MIN_POOL_SIZE")
+}
+
+func loadMongoConnectTimeout() (time.Duration, error) {
+	return requireDuration("MONGO_CONNECT_TIMEOUT")
+}
+
+func loadMongoPingTimeout() (time.Duration, error) {
+	return requireDuration("MONGO_PING_TIMEOUT")
 }

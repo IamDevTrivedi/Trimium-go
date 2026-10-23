@@ -13,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"server/internal/config"
+	"server/internal/database"
 	"server/internal/logger"
 	"server/internal/mailer"
 	"server/internal/middleware"
@@ -45,6 +46,26 @@ func run() error {
 
 	log.Info("Mailer verification succeeded")
 
+	mongoStore, err := database.NewMongo(context.Background(), cfg.MongoURI, cfg.MongoDatabase, database.MongoOptions{
+		MaxPoolSize:    cfg.MongoMaxPoolSize,
+		MinPoolSize:    cfg.MongoMinPoolSize,
+		ConnectTimeout: cfg.MongoConnectTimeout,
+		PingTimeout:    cfg.MongoPingTimeout,
+	})
+	if err != nil {
+		return fmt.Errorf("mongo error: %w", err)
+	}
+	defer func() {
+		closeCtx, closeCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer closeCancel()
+
+		if err := mongoStore.Close(closeCtx); err != nil {
+			log.Error(fmt.Sprintf("failed to close MongoDB connection: %v", err))
+		}
+	}()
+
+	log.Info("MongoDB connection established")
+
 	if cfg.AppEnv == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -53,8 +74,7 @@ func run() error {
 
 	geo, err := middleware.NewGeoResolver("./data/geoip/GeoLite2-City.mmdb")
 	if err != nil {
-		log.Error(fmt.Sprintf("failed to initialize GeoResolver: %v", err))
-		os.Exit(1)
+		return fmt.Errorf("failed to initialize GeoResolver: %w", err)
 	}
 	defer geo.Close()
 

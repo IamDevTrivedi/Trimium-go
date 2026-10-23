@@ -255,6 +255,12 @@ func TestGet(t *testing.T) {
 	t.Setenv("BACKEND_URL_PROD", "https://api.example.com")
 	t.Setenv("FRONTEND_URL_PROD", "https://example.com")
 	t.Setenv("GEOIP_DB_PATH", "./data/geoip/GeoLite2-City.mmdb")
+	t.Setenv("MONGO_URI", "mongodb://localhost:27017")
+	t.Setenv("MONGO_DB_NAME", "trimium")
+	t.Setenv("MONGO_MAX_POOL_SIZE", "100")
+	t.Setenv("MONGO_MIN_POOL_SIZE", "0")
+	t.Setenv("MONGO_CONNECT_TIMEOUT", "10s")
+	t.Setenv("MONGO_PING_TIMEOUT", "10s")
 
 	client1 := Get()
 	if client1 == nil {

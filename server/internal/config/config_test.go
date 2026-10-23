@@ -2,8 +2,10 @@ package config
 
 import (
 	"os"
+	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 func resetState() {
@@ -326,6 +328,194 @@ func TestLoadGeoIPDBPath(t *testing.T) {
 	}
 }
 
+func TestLoadMongoURI(t *testing.T) {
+	tests := []struct {
+		name      string
+		value     string
+		want      string
+		expectErr bool
+	}{
+		{"valid uri", "mongodb://localhost:27017", "mongodb://localhost:27017", false},
+		{"valid uri with auth", "mongodb://root:root@localhost:5002/?authSource=admin", "mongodb://root:root@localhost:5002/?authSource=admin", false},
+		{"empty uri", "", "", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("MONGO_URI", tt.value)
+
+			got, err := loadMongoURI()
+			if tt.expectErr && err == nil {
+				t.Fatalf("expected error, got nil")
+			}
+			if !tt.expectErr && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestLoadMongoDatabase(t *testing.T) {
+	tests := []struct {
+		name      string
+		value     string
+		want      string
+		expectErr bool
+	}{
+		{"valid database", "trimium", "trimium", false},
+		{"empty database", "", "", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("MONGO_DB_NAME", tt.value)
+
+			got, err := loadMongoDatabase()
+			if tt.expectErr && err == nil {
+				t.Fatalf("expected error, got nil")
+			}
+			if !tt.expectErr && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestLoadMongoMaxPoolSize(t *testing.T) {
+	tests := []struct {
+		name      string
+		value     string
+		want      uint64
+		expectErr bool
+	}{
+		{"missing", "", 0, true},
+		{"valid size", "50", 50, false},
+		{"zero means unlimited", "0", 0, false},
+		{"invalid non-numeric", "abc", 0, true},
+		{"invalid negative", "-1", 0, true},
+		{"invalid fractional", "1.5", 0, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("MONGO_MAX_POOL_SIZE", tt.value)
+
+			got, err := loadMongoMaxPoolSize()
+			if tt.expectErr && err == nil {
+				t.Fatalf("expected error, got nil")
+			}
+			if !tt.expectErr && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tt.want {
+				t.Errorf("got %d, want %d", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestLoadMongoMinPoolSize(t *testing.T) {
+	tests := []struct {
+		name      string
+		value     string
+		want      uint64
+		expectErr bool
+	}{
+		{"missing", "", 0, true},
+		{"valid size", "10", 10, false},
+		{"invalid non-numeric", "abc", 0, true},
+		{"invalid negative", "-1", 0, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("MONGO_MIN_POOL_SIZE", tt.value)
+
+			got, err := loadMongoMinPoolSize()
+			if tt.expectErr && err == nil {
+				t.Fatalf("expected error, got nil")
+			}
+			if !tt.expectErr && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tt.want {
+				t.Errorf("got %d, want %d", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestLoadMongoConnectTimeout(t *testing.T) {
+	tests := []struct {
+		name      string
+		value     string
+		want      time.Duration
+		expectErr bool
+	}{
+		{"missing", "", 0, true},
+		{"valid seconds", "5s", 5 * time.Second, false},
+		{"valid milliseconds", "1500ms", 1500 * time.Millisecond, false},
+		{"invalid non-duration", "abc", 0, true},
+		{"invalid zero", "0s", 0, true},
+		{"invalid negative", "-1s", 0, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("MONGO_CONNECT_TIMEOUT", tt.value)
+
+			got, err := loadMongoConnectTimeout()
+			if tt.expectErr && err == nil {
+				t.Fatalf("expected error, got nil")
+			}
+			if !tt.expectErr && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tt.want {
+				t.Errorf("got %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestLoadMongoPingTimeout(t *testing.T) {
+	tests := []struct {
+		name      string
+		value     string
+		want      time.Duration
+		expectErr bool
+	}{
+		{"missing", "", 0, true},
+		{"valid seconds", "3s", 3 * time.Second, false},
+		{"invalid non-duration", "abc", 0, true},
+		{"invalid zero", "0s", 0, true},
+		{"invalid negative", "-1s", 0, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("MONGO_PING_TIMEOUT", tt.value)
+
+			got, err := loadMongoPingTimeout()
+			if tt.expectErr && err == nil {
+				t.Fatalf("expected error, got nil")
+			}
+			if !tt.expectErr && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tt.want {
+				t.Errorf("got %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestLoadEnvFile(t *testing.T) {
 	t.Run("production allows missing env file", func(t *testing.T) {
 		err := loadEnvFile("production")
@@ -361,6 +551,35 @@ func TestGet(t *testing.T) {
 		}
 	})
 
+	t.Run("missing mongo settings returns error", func(t *testing.T) {
+		resetState()
+		t.Setenv("APP_ENV", "production")
+		t.Setenv("PORT", "3000")
+		t.Setenv("SMTP_HOST", "smtp.example.com")
+		t.Setenv("SMTP_PORT", "587")
+		t.Setenv("FROM_EMAIL", "noreply@example.com")
+		t.Setenv("BACKEND_URL_PROD", "https://api.trimium.example.com")
+		t.Setenv("FRONTEND_URL_PROD", "https://trimium.example.com")
+		t.Setenv("GEOIP_DB_PATH", "./data/geoip/GeoLite2-City.mmdb")
+		t.Setenv("MONGO_URI", "mongodb://localhost:27017")
+		t.Setenv("MONGO_DB_NAME", "trimium")
+		t.Setenv("MONGO_MAX_POOL_SIZE", "")
+		t.Setenv("MONGO_MIN_POOL_SIZE", "")
+		t.Setenv("MONGO_CONNECT_TIMEOUT", "")
+		t.Setenv("MONGO_PING_TIMEOUT", "")
+
+		cfg, err := Get()
+		if err == nil {
+			t.Fatalf("expected error, got nil")
+		}
+		if cfg != nil {
+			t.Fatalf("expected nil config, got %v", cfg)
+		}
+		if !strings.Contains(err.Error(), "missing MONGO_MAX_POOL_SIZE") {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
+
 	t.Run("valid configuration loads and caches instance", func(t *testing.T) {
 		resetState()
 		t.Setenv("APP_ENV", "production")
@@ -373,6 +592,12 @@ func TestGet(t *testing.T) {
 		t.Setenv("BACKEND_URL_PROD", "https://api.trimium.example.com")
 		t.Setenv("FRONTEND_URL_PROD", "https://trimium.example.com")
 		t.Setenv("GEOIP_DB_PATH", "./data/geoip/GeoLite2-City.mmdb")
+		t.Setenv("MONGO_URI", "mongodb://localhost:27017")
+		t.Setenv("MONGO_DB_NAME", "trimium")
+		t.Setenv("MONGO_MAX_POOL_SIZE", "50")
+		t.Setenv("MONGO_MIN_POOL_SIZE", "5")
+		t.Setenv("MONGO_CONNECT_TIMEOUT", "3s")
+		t.Setenv("MONGO_PING_TIMEOUT", "2s")
 
 		cfg1, err := Get()
 		if err != nil {
@@ -410,6 +635,24 @@ func TestGet(t *testing.T) {
 		}
 		if cfg1.GeoIPDBPath != "./data/geoip/GeoLite2-City.mmdb" {
 			t.Errorf("got geoIPDBPath %q, want ./data/geoip/GeoLite2-City.mmdb", cfg1.GeoIPDBPath)
+		}
+		if cfg1.MongoURI != "mongodb://localhost:27017" {
+			t.Errorf("got mongoURI %q, want mongodb://localhost:27017", cfg1.MongoURI)
+		}
+		if cfg1.MongoDatabase != "trimium" {
+			t.Errorf("got mongoDatabase %q, want trimium", cfg1.MongoDatabase)
+		}
+		if cfg1.MongoMaxPoolSize != 50 {
+			t.Errorf("got mongoMaxPoolSize %d, want 50", cfg1.MongoMaxPoolSize)
+		}
+		if cfg1.MongoMinPoolSize != 5 {
+			t.Errorf("got mongoMinPoolSize %d, want 5", cfg1.MongoMinPoolSize)
+		}
+		if cfg1.MongoConnectTimeout != 3*time.Second {
+			t.Errorf("got mongoConnectTimeout %v, want 3s", cfg1.MongoConnectTimeout)
+		}
+		if cfg1.MongoPingTimeout != 2*time.Second {
+			t.Errorf("got mongoPingTimeout %v, want 2s", cfg1.MongoPingTimeout)
 		}
 
 		// Subsequent call returns cached instance even if environment changes
@@ -449,6 +692,12 @@ func TestGet(t *testing.T) {
 		t.Setenv("BACKEND_URL_PROD", "https://api.trimium.trivedi.dev")
 		t.Setenv("FRONTEND_URL_PROD", "https://trimium.vercel.app")
 		t.Setenv("GEOIP_DB_PATH", "./data/geoip/GeoLite2-City.mmdb")
+		t.Setenv("MONGO_URI", "mongodb://root:root@localhost:5002/?authSource=admin")
+		t.Setenv("MONGO_DB_NAME", "trimium")
+		t.Setenv("MONGO_MAX_POOL_SIZE", "100")
+		t.Setenv("MONGO_MIN_POOL_SIZE", "0")
+		t.Setenv("MONGO_CONNECT_TIMEOUT", "10s")
+		t.Setenv("MONGO_PING_TIMEOUT", "10s")
 
 		cfg, err := Get()
 		if err != nil {
@@ -474,6 +723,12 @@ func TestGet(t *testing.T) {
 		t.Setenv("BACKEND_URL_PROD", "https://api.trimium.trivedi.dev")
 		t.Setenv("FRONTEND_URL_PROD", "https://trimium.vercel.app")
 		t.Setenv("GEOIP_DB_PATH", "./data/geoip/GeoLite2-City.mmdb")
+		t.Setenv("MONGO_URI", "mongodb://root:root@localhost:5002/?authSource=admin")
+		t.Setenv("MONGO_DB_NAME", "trimium")
+		t.Setenv("MONGO_MAX_POOL_SIZE", "100")
+		t.Setenv("MONGO_MIN_POOL_SIZE", "0")
+		t.Setenv("MONGO_CONNECT_TIMEOUT", "10s")
+		t.Setenv("MONGO_PING_TIMEOUT", "10s")
 
 		cfg, err := Get()
 		if err != nil {
