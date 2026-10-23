@@ -7,6 +7,7 @@ import (
 	"net/mail"
 	"os"
 	"strconv"
+	"sync"
 
 	"github.com/joho/godotenv"
 )
@@ -26,14 +27,16 @@ type Config struct {
 var (
 	cached *Config
 	err    error
+	once   sync.Once
 )
 
 // Get returns the singleton Config, loading it on first call.
-// Subsequent calls return the same instance without re-reading the environment.
+// Subsequent calls return the same instance (or the same error) without
+// re-reading the environment.
 func Get() (*Config, error) {
-	if cached == nil && err == nil {
+	once.Do(func() {
 		cached, err = load()
-	}
+	})
 	return cached, err
 }
 
