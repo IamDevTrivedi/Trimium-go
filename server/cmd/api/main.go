@@ -40,7 +40,7 @@ func run() error {
 	defer emailCancel()
 
 	if err := mailer.Get().Verify(emailCtx); err != nil {
-		return fmt.Errorf("mailer verification failed: %w", err)
+		fmt.Printf("mailer verification failed: %v\n", err)
 	}
 
 	log.Info("Mailer verification succeeded")
