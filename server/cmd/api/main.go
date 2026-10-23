@@ -50,7 +50,22 @@ func run() error {
 	}
 
 	router := gin.New()
-	router.Use(middleware.RequestLogger(), gin.Recovery())
+
+	geo, err := middleware.NewGeoResolver("./data/geoip/GeoLite2-City.mmdb")
+	if err != nil {
+		log.Error(fmt.Sprintf("failed to initialize GeoResolver: %v", err))
+		os.Exit(1)
+	}
+	defer geo.Close()
+
+	router.Use(
+		gin.Recovery(),
+		middleware.RequestID(),
+		middleware.RequestIP(),
+		middleware.RequestLogger(),
+		middleware.RequestUserAgent(),
+		middleware.RequestGeo(geo),
+	)
 
 	rootService := root.NewService()
 	rootHandler := root.NewHandler(rootService)

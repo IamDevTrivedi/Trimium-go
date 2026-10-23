@@ -167,11 +167,11 @@ func loadSMTPPort() (int, error) {
 }
 
 func loadSMTPUsername() (string, error) {
-	return requireString("SMTP_USERNAME")
+	return os.Getenv("SMTP_USERNAME"), nil
 }
 
 func loadSMTPPassword() (string, error) {
-	return requireString("SMTP_PASSWORD")
+	return os.Getenv("SMTP_PASSWORD"), nil
 }
 
 func loadFromEmail() (string, error) {

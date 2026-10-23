@@ -4,3 +4,6 @@
 # Build artifacts
 server/bin/
 server/tmp/
+
+# .mmdb files
+**/*.mmdb
