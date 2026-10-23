@@ -1,45 +1,93 @@
+# Global settings
+SHELL       := /bin/bash
+.SHELLFLAGS := -eu -o pipefail -c
+
+.DEFAULT_GOAL := help
+
+# Project variables
+APP_NAME  := api
+BIN_DIR   := bin
+BIN       := $(BIN_DIR)/$(APP_NAME)
+CMD_PATH  := ./cmd/api
+
+# Runtime environments
+DEV_ENV   ?= development
+PROD_ENV  ?= production
+
+# Docker variables
+COMPOSE_FILE := docker-compose.dev.yml
+
+# Tool variables
 GOLANGCI_LINT_VERSION ?= v2.14.0
+GOLANGCI_LINT         := golangci-lint
+AIR                   := air
 
-.PHONY: build test run run-build dev up down fmt fmt-check lint lint-check install-lint setup
+# Phony targets
+.PHONY: help setup clean \
+        build run run-build dev \
+        test \
+        fmt fmt-check \
+        lint lint-check \
+        up down \
+        install-lint install-air
 
-build:
-	go build -o bin/api ./cmd/api
+# Help
+help: ## Show available targets
+	@printf "Usage:\n  make <target>\n\nTargets:\n"
+	@awk 'BEGIN {FS = ":.*##"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
 
-test:
-	go test ./... -race -cover
+# Setup & tooling
+setup: install-lint install-air ## Install all development tooling
 
-run:
-	APP_ENV=development go run ./cmd/api
-
-run-build:
-	APP_ENV=production ./bin/api
-
-dev:
-	air
-
-up:
-	docker compose -f docker-compose.dev.yml up -d
-
-down:
-	docker compose -f docker-compose.dev.yml down
-
-fmt-check:
-	@out=$$(gofmt -l .); \
-	if [ -n "$$out" ]; then \
-		echo "Unformatted files:"; echo "$$out"; exit 1; \
-	fi
-
-fmt:
-	gofmt -w .
-
-install-lint:
+install-lint: ## Install golangci-lint (version set by GOLANGCI_LINT_VERSION)
 	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
 
-lint:
-	golangci-lint run --fix
+install-air: ## Install air for live reloading
+	go install github.com/air-verse/air@latest
 
-lint-check:
-	golangci-lint run
+# Build & run
+build: ## Compile the binary into ./bin
+	@mkdir -p $(BIN_DIR)
+	go build -o $(BIN) $(CMD_PATH)
 
-setup: install-lint
-	go install github.com/cosmtrek/air@latest
+run: ## Run the app in development mode
+	APP_ENV=$(DEV_ENV) go run $(CMD_PATH)
+
+run-build: ## Run the compiled binary in production mode
+	APP_ENV=$(PROD_ENV) $(BIN)
+
+dev: ## Start the app with live reload (air)
+	$(AIR)
+
+clean: ## Remove build artifacts
+	rm -rf $(BIN_DIR)
+
+# Test
+test: ## Run all tests with race detector and coverage
+	go test ./... -race -cover
+
+# Formatting
+fmt: ## Format Go source files in-place
+	gofmt -w .
+
+fmt-check: ## Fail if any Go files are not formatted
+	@unformatted=$$(gofmt -l .); \
+	if [ -n "$$unformatted" ]; then \
+		echo "Unformatted files:"; \
+		echo "$$unformatted"; \
+		exit 1; \
+	fi
+
+# Linting
+lint: ## Run golangci-lint with automatic fixes
+	$(GOLANGCI_LINT) run --fix
+
+lint-check: ## Run golangci-lint without applying fixes
+	$(GOLANGCI_LINT) run
+
+# Docker
+up: ## Start docker-compose development stack (detached)
+	docker compose -f $(COMPOSE_FILE) up -d
+
+down: ## Stop docker-compose development stack
+	docker compose -f $(COMPOSE_FILE) down
