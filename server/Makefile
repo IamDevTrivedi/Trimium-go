@@ -21,6 +21,8 @@ COMPOSE_FILE := docker-compose.dev.yml
 GOLANGCI_LINT_VERSION ?= v2.14.0
 GOLANGCI_LINT         := golangci-lint
 AIR                   := air
+GOFMT                 := gofmt
+GO                    := go
 
 # Phony targets
 .PHONY: help setup clean \
@@ -40,20 +42,20 @@ help: ## Show available targets
 setup: install-lint install-air ## Install all development tooling
 
 install-lint: ## Install golangci-lint (version set by GOLANGCI_LINT_VERSION)
-	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
+	$(GO) install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
 
 install-air: ## Install air for live reloading
-	go install github.com/air-verse/air@latest
+	$(GO) install github.com/air-verse/air@latest
 
 # Build & run
 build: ## Compile the binary into ./bin
 	@mkdir -p $(BIN_DIR)
-	go build -o $(BIN) $(CMD_PATH)
+	$(GO) build -o $(BIN) $(CMD_PATH)
 
 run: ## Run the app in development mode
-	APP_ENV=$(DEV_ENV) go run $(CMD_PATH)
+	APP_ENV=$(DEV_ENV) $(GO) run $(CMD_PATH)
 
-run-build: ## Run the compiled binary in production mode
+run-build: build ## Build, then run the compiled binary in production mode
 	APP_ENV=$(PROD_ENV) $(BIN)
 
 dev: ## Start the app with live reload (air)
@@ -64,14 +66,14 @@ clean: ## Remove build artifacts
 
 # Test
 test: ## Run all tests with race detector and coverage
-	go test ./... -race -cover
+	$(GO) test ./... -race -cover
 
 # Formatting
 fmt: ## Format Go source files in-place
-	gofmt -w .
+	$(GOFMT) -w .
 
 fmt-check: ## Fail if any Go files are not formatted
-	@unformatted=$$(gofmt -l .); \
+	@unformatted=$$($(GOFMT) -l .); \
 	if [ -n "$$unformatted" ]; then \
 		echo "Unformatted files:"; \
 		echo "$$unformatted"; \
