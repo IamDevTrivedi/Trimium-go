@@ -161,11 +161,7 @@ func TestLoadSMTPUsername(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Setenv("SMTP_USERNAME", tt.value)
 
-			got, err := loadSMTPUsername()
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if got != tt.want {
+			if got := loadSMTPUsername(); got != tt.want {
 				t.Errorf("got %q, want %q", got, tt.want)
 			}
 		})
@@ -186,11 +182,7 @@ func TestLoadSMTPPassword(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Setenv("SMTP_PASSWORD", tt.value)
 
-			got, err := loadSMTPPassword()
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if got != tt.want {
+			if got := loadSMTPPassword(); got != tt.want {
 				t.Errorf("got %q, want %q", got, tt.want)
 			}
 		})

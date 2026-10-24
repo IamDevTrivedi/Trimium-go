@@ -80,15 +80,8 @@ func load() (*Config, error) {
 		return nil, err
 	}
 
-	smtpUsername, err := loadSMTPUsername()
-	if err != nil {
-		return nil, err
-	}
-
-	smtpPassword, err := loadSMTPPassword()
-	if err != nil {
-		return nil, err
-	}
+	smtpUsername := loadSMTPUsername()
+	smtpPassword := loadSMTPPassword()
 
 	fromEmail, err := loadFromEmail()
 	if err != nil {
@@ -332,12 +325,12 @@ func loadSMTPPort() (int, error) {
 	return requirePort("SMTP_PORT")
 }
 
-func loadSMTPUsername() (string, error) {
-	return os.Getenv("SMTP_USERNAME"), nil
+func loadSMTPUsername() string {
+	return os.Getenv("SMTP_USERNAME")
 }
 
-func loadSMTPPassword() (string, error) {
-	return os.Getenv("SMTP_PASSWORD"), nil
+func loadSMTPPassword() string {
+	return os.Getenv("SMTP_PASSWORD")
 }
 
 func loadFromEmail() (string, error) {
