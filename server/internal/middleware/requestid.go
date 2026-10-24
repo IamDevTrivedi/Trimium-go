@@ -28,13 +28,13 @@ func newRequestID() string {
 
 // fallbackID: fallback-<epoch ms>-<8 hex chars>
 func fallbackID() string {
+	now := time.Now()
 	b := make([]byte, 4)
 	if _, err := rand.Read(b); err != nil {
 		// crypto/rand failed too; use nanosecond time as the entropy source
-		n := time.Now().UnixNano()
-		b = []byte{byte(n), byte(n >> 8), byte(n >> 16), byte(n >> 24)}
+		return fmt.Sprintf("fallback-%d-%08x", now.UnixMilli(), now.UnixNano()&0xffffffff)
 	}
-	return fmt.Sprintf("fallback-%d-%s", time.Now().UnixMilli(), hex.EncodeToString(b))
+	return fmt.Sprintf("fallback-%d-%s", now.UnixMilli(), hex.EncodeToString(b))
 }
 
 func GetRequestID(c *gin.Context) string {
