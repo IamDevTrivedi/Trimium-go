@@ -21,7 +21,9 @@ COMPOSE_FILE := docker-compose.dev.yml
 
 # Tool variables
 GOLANGCI_LINT_VERSION ?= v2.14.0
+GOVULNCHECK_VERSION   ?= v1.9.0
 GOLANGCI_LINT         := golangci-lint
+GOVULNCHECK           := govulncheck
 AIR                   := air
 GOFMT                 := gofmt
 GO                    := go
@@ -29,26 +31,29 @@ GO                    := go
 # Phony targets
 .PHONY: help setup clean \
         build run run-build dev \
-        test \
+        test vet govulncheck \
         fmt fmt-check \
         lint lint-check \
         up down \
-        install-lint install-air \
+        install-lint install-air install-govulncheck \
 		geoip-update geoip-check
 
 # Help
 help: ## Show available targets
 	@printf "Usage:\n  make <target>\n\nTargets:\n"
-	@awk 'BEGIN {FS = ":.*##"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS = ":.*##"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
 
 # Setup & tooling
-setup: install-lint install-air ## Install all development tooling
+setup: install-lint install-air install-govulncheck ## Install all development tooling
 
 install-lint: ## Install golangci-lint (version set by GOLANGCI_LINT_VERSION)
 	$(GO) install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
 
 install-air: ## Install air for live reloading
 	$(GO) install github.com/air-verse/air@latest
+
+install-govulncheck: ## Install govulncheck (version set by GOVULNCHECK_VERSION)
+	$(GO) install golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION)
 
 # Build & run
 build: ## Compile the binary into ./bin
@@ -70,6 +75,12 @@ clean: ## Remove build artifacts
 # Test
 test: ## Run all tests with race detector and coverage
 	$(GO) test ./... -race -cover
+
+vet: ## Run go vet on all packages
+	$(GO) vet ./...
+
+govulncheck: ## Scan code, dependencies and toolchain for known vulnerabilities
+	$(GOVULNCHECK) ./...
 
 # Formatting
 fmt: ## Format Go source files in-place
