@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Server CI architecture · Trimium</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper: #f5f5f5;
+      --color-ink: #2d3142;
+      --color-muted: #4f5d75;
+      --color-soft: #5a6580;
+      --color-rule: rgba(45, 49, 66, 0.12);
+      --color-accent: #bf4520;
+      --font-sans: 'Geist', system-ui, sans-serif;
+      --font-serif: 'Instrument Serif', 'Noto Serif', serif;
+      --font-mono: 'Geist Mono', ui-monospace, monospace;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem 2rem;
+    }
+
+    .frame { max-width: 1280px; width: 100%; }
+
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.66rem;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--color-muted);
+      margin-bottom: 0.5rem;
+    }
+
+    h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(1.6rem, 2.2vw + 0.9rem, 2rem);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      color: var(--color-ink);
+      margin-bottom: 0.5rem;
+    }
+
+    .subtitle {
+      font-size: 1rem;
+      line-height: 1.55;
+      color: var(--color-muted);
+      max-width: 62ch;
+      margin-bottom: 2rem;
+    }
+
+    .diagram-container { width: 100%; overflow-x: auto; }
+    svg { width: 100%; min-width: 1280px; display: block; }
+
+    .diagram-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-top: 0.75rem;
+      font-family: var(--font-mono);
+      font-size: 0.66rem;
+      line-height: 1.5;
+      letter-spacing: 0.04em;
+      color: var(--color-soft);
+    }
+    .diagram-meta span:last-child { text-align: right; }
+
+    @media print {
+      .diagram-container { overflow-x: visible; }
+      svg { min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">CI · GitHub Actions</p>
+    <h1>How Server CI runs</h1>
+    <p class="subtitle">Triggers, GitHub-hosted runners, and the aggregator that protects main.</p>
+
+    <div class="diagram-container">
+      <svg viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="server-ci-architecture-title server-ci-architecture-desc">
+        <title id="server-ci-architecture-title">Server CI workflow architecture</title>
+        <desc id="server-ci-architecture-desc">Architecture of the Server CI workflow: pull requests, pushes to main, manual runs, and a nightly schedule feed five jobs on GitHub-hosted runners, which report to the CI gate that protects main.</desc>
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/>
+          </marker>
+          <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#bf4520"/>
+          </marker>
+          <marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#2e5aa8"/>
+          </marker>
+        </defs>
+
+        <rect width="100%" height="100%" fill="#f5f5f5"/>
+
+        <!-- Zones are painted first, then connectors, then nodes. -->
+        <rect x="32" y="32" width="1216" height="132" rx="8" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+        <rect x="48" y="36" width="60" height="12" rx="2" fill="#f5f5f5"/>
+        <text x="78" y="45" fill="#5a6580" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.14em">TRIGGERS</text>
+
+        <rect x="32" y="180" width="1216" height="300" rx="8" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+        <rect x="48" y="184" width="92" height="12" rx="2" fill="#f5f5f5"/>
+        <text x="94" y="193" fill="#5a6580" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.14em">JOBS · RUNNERS</text>
+
+        <rect x="32" y="496" width="1216" height="136" rx="8" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+        <rect x="48" y="500" width="40" height="12" rx="2" fill="#f5f5f5"/>
+        <text x="68" y="509" fill="#5a6580" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.14em">GATE</text>
+
+        <!-- Connectors are drawn before the node boxes so lines sit behind fills. -->
+        <!-- Code events fan out to the four code-event jobs. -->
+        <line x1="160" y1="148" x2="160" y2="228" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <line x1="400" y1="148" x2="400" y2="228" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <line x1="640" y1="148" x2="640" y2="228" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <line x1="880" y1="148" x2="880" y2="228" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <!-- The nightly schedule reaches Security only. -->
+        <line x1="1120" y1="148" x2="1120" y2="228" stroke="#4f5d75" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+        <!-- Every job reports to the gate. -->
+        <line x1="160" y1="428" x2="160" y2="532" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <line x1="400" y1="428" x2="400" y2="532" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <line x1="640" y1="428" x2="640" y2="532" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <line x1="880" y1="428" x2="880" y2="532" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <line x1="1120" y1="428" x2="1120" y2="532" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+        <!-- Trigger: code events -->
+        <rect x="60" y="68" width="920" height="80" rx="6" fill="#f5f5f5"/>
+        <rect x="60" y="68" width="920" height="80" rx="6" fill="rgba(79,93,117,0.10)" stroke="#5a6580" stroke-width="1"/>
+        <rect x="68" y="74" width="44" height="12" rx="2" fill="transparent" stroke="rgba(90,101,128,0.40)" stroke-width="0.8"/>
+        <text x="90" y="83" fill="#5a6580" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">TRIGGER</text>
+        <text x="76" y="108" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Code events</text>
+        <text x="76" y="126" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace">pull_request · push main · workflow_dispatch</text>
+        <text x="968" y="96" fill="#5a6580" font-size="7" font-family="'Geist Mono', monospace" text-anchor="end" letter-spacing="0.14em">FULL RUN</text>
+        <text x="968" y="114" fill="#2d3142" font-size="9" font-weight="500" font-family="'Geist Mono', monospace" text-anchor="end" letter-spacing="0.06em">ALL FIVE JOBS</text>
+
+        <!-- Trigger: nightly schedule -->
+        <rect x="1020" y="68" width="200" height="80" rx="6" fill="#f5f5f5"/>
+        <rect x="1020" y="68" width="200" height="80" rx="6" fill="rgba(79,93,117,0.10)" stroke="#5a6580" stroke-width="1"/>
+        <rect x="1028" y="74" width="44" height="12" rx="2" fill="transparent" stroke="rgba(90,101,128,0.40)" stroke-width="0.8"/>
+        <text x="1050" y="83" fill="#5a6580" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">CRON</text>
+        <text x="1036" y="108" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Daily schedule</text>
+        <text x="1036" y="126" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace">03:17 UTC · SECURITY ONLY</text>
+        <!-- Job: Quality -->
+        <rect x="60" y="228" width="200" height="200" rx="6" fill="#f5f5f5"/>
+        <rect x="60" y="228" width="200" height="200" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <rect x="68" y="234" width="84" height="12" rx="2" fill="transparent" stroke="rgba(45,49,66,0.40)" stroke-width="0.8"/>
+        <text x="110" y="243" fill="#5a6580" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">UBUNTU-LATEST</text>
+        <text x="160" y="274" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Quality</text>
+        <line x1="72" y1="292" x2="248" y2="292" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+        <text x="76" y="316" fill="#2d3142" font-size="9" font-family="'Geist Mono', monospace">go mod verify · tidy</text>
+        <text x="76" y="334" fill="#2d3142" font-size="9" font-family="'Geist Mono', monospace">gofmt · golangci-lint</text>
+        <text x="76" y="352" fill="#2d3142" font-size="9" font-family="'Geist Mono', monospace">fmt --diff · go vet</text>
+        <line x1="72" y1="396" x2="248" y2="396" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+        <text x="76" y="416" fill="#5a6580" font-size="7" font-family="'Geist Mono', monospace" letter-spacing="0.08em">PR · PUSH · MANUAL</text>
+
+        <!-- Job: Test (race) -->
+        <rect x="300" y="228" width="200" height="200" rx="6" fill="#f5f5f5"/>
+        <rect x="300" y="228" width="200" height="200" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <rect x="308" y="234" width="84" height="12" rx="2" fill="transparent" stroke="rgba(45,49,66,0.40)" stroke-width="0.8"/>
+        <text x="350" y="243" fill="#5a6580" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">UBUNTU-LATEST</text>
+        <text x="400" y="274" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Test (race)</text>
+        <line x1="312" y1="292" x2="488" y2="292" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+        <text x="316" y="316" fill="#2d3142" font-size="9" font-family="'Geist Mono', monospace">go test ./...</text>
+        <text x="316" y="334" fill="#2d3142" font-size="9" font-family="'Geist Mono', monospace">-race</text>
+        <text x="316" y="352" fill="#2d3142" font-size="9" font-family="'Geist Mono', monospace">-count=1</text>
+        <line x1="312" y1="396" x2="488" y2="396" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+        <text x="316" y="416" fill="#5a6580" font-size="7" font-family="'Geist Mono', monospace" letter-spacing="0.08em">PR · PUSH · MANUAL</text>
+
+        <!-- Job: Test (coverage) -->
+        <rect x="540" y="228" width="200" height="200" rx="6" fill="#f5f5f5"/>
+        <rect x="540" y="228" width="200" height="200" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <rect x="548" y="234" width="84" height="12" rx="2" fill="transparent" stroke="rgba(45,49,66,0.40)" stroke-width="0.8"/>
+        <text x="590" y="243" fill="#5a6580" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">UBUNTU-LATEST</text>
+        <text x="640" y="274" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Test (coverage)</text>
+        <line x1="552" y1="292" x2="728" y2="292" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+        <text x="556" y="316" fill="#2d3142" font-size="9" font-family="'Geist Mono', monospace">go test ./...</text>
+        <text x="556" y="334" fill="#2d3142" font-size="9" font-family="'Geist Mono', monospace">-coverprofile=coverage.out</text>
+        <text x="556" y="352" fill="#2d3142" font-size="9" font-family="'Geist Mono', monospace">-covermode=count</text>
+        <rect x="552" y="364" width="176" height="20" rx="4" fill="rgba(45,49,66,0.05)" stroke="#4f5d75" stroke-width="0.9"/>
+        <text x="640" y="377" fill="#4f5d75" font-size="7.5" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.04em">ARTIFACT · coverage-report · 7d</text>
+        <line x1="552" y1="396" x2="728" y2="396" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+        <text x="556" y="416" fill="#5a6580" font-size="7" font-family="'Geist Mono', monospace" letter-spacing="0.08em">PR · PUSH · MANUAL</text>
+
+        <!-- Job: Build -->
+        <rect x="780" y="228" width="200" height="200" rx="6" fill="#f5f5f5"/>
+        <rect x="780" y="228" width="200" height="200" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <rect x="788" y="234" width="84" height="12" rx="2" fill="transparent" stroke="rgba(45,49,66,0.40)" stroke-width="0.8"/>
+        <text x="830" y="243" fill="#5a6580" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">MATRIX · 3 LEGS</text>
+        <text x="880" y="274" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Build</text>
+        <line x1="792" y1="292" x2="968" y2="292" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+        <text x="796" y="316" fill="#2d3142" font-size="9" font-family="'Geist Mono', monospace">go build ./...</text>
+        <text x="796" y="334" fill="#2d3142" font-size="9" font-family="'Geist Mono', monospace">ubuntu · macOS</text>
+        <text x="796" y="352" fill="#2d3142" font-size="9" font-family="'Geist Mono', monospace">Windows</text>
+        <line x1="792" y1="396" x2="968" y2="396" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+        <text x="796" y="416" fill="#5a6580" font-size="7" font-family="'Geist Mono', monospace" letter-spacing="0.08em">PR · PUSH · MANUAL</text>
+
+        <!-- Job: Security -->
+        <rect x="1020" y="228" width="200" height="200" rx="6" fill="#f5f5f5"/>
+        <rect x="1020" y="228" width="200" height="200" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <rect x="1028" y="234" width="84" height="12" rx="2" fill="transparent" stroke="rgba(45,49,66,0.40)" stroke-width="0.8"/>
+        <text x="1070" y="243" fill="#5a6580" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">UBUNTU-LATEST</text>
+        <text x="1120" y="274" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Security</text>
+        <line x1="1032" y1="292" x2="1208" y2="292" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+        <text x="1036" y="316" fill="#2d3142" font-size="9" font-family="'Geist Mono', monospace">govulncheck@v1.9.0</text>
+        <text x="1036" y="334" fill="#2d3142" font-size="9" font-family="'Geist Mono', monospace">./... · reachable only</text>
+        <text x="1036" y="352" fill="#2d3142" font-size="9" font-family="'Geist Mono', monospace">Go advisory DB</text>
+        <line x1="1032" y1="396" x2="1208" y2="396" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+        <text x="1036" y="416" fill="#5a6580" font-size="7" font-family="'Geist Mono', monospace" letter-spacing="0.08em">ALL EVENTS</text>
+        <!-- Gate: the required aggregator check -->
+        <rect x="60" y="532" width="1160" height="80" rx="6" fill="#f5f5f5"/>
+        <rect x="60" y="532" width="1160" height="80" rx="6" fill="rgba(191,69,32,0.08)" stroke="#bf4520" stroke-width="1.2"/>
+        <rect x="68" y="538" width="76" height="12" rx="2" fill="transparent" stroke="rgba(191,69,32,0.40)" stroke-width="0.8"/>
+        <text x="106" y="547" fill="#bf4520" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">AGGREGATOR</text>
+        <text x="84" y="570" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif">CI</text>
+        <text x="84" y="588" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace">needs: all 5 · if: always()</text>
+        <text x="1200" y="556" fill="#bf4520" font-size="7" font-family="'Geist Mono', monospace" text-anchor="end" letter-spacing="0.14em">REQUIRED CHECK</text>
+        <text x="1200" y="574" fill="#2d3142" font-size="9" font-family="'Geist Mono', monospace" text-anchor="end" letter-spacing="0.04em">FAILURE / CANCELLED = FAIL</text>
+        <text x="1200" y="590" fill="#5a6580" font-size="7.5" font-family="'Geist Mono', monospace" text-anchor="end">runs after every job · skipped jobs do not fail</text>
+
+        <!-- Legend strip -->
+        <line x1="32" y1="652" x2="1248" y2="652" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+        <text x="32" y="670" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">LEGEND</text>
+
+        <rect x="112" y="661" width="14" height="10" rx="2" fill="rgba(79,93,117,0.10)" stroke="#5a6580" stroke-width="0.8"/>
+        <text x="132" y="670" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Trigger</text>
+
+        <rect x="292" y="661" width="14" height="10" rx="2" fill="#ffffff" stroke="#2d3142" stroke-width="0.8"/>
+        <text x="312" y="670" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Job</text>
+
+        <rect x="452" y="661" width="14" height="10" rx="2" fill="rgba(45,49,66,0.05)" stroke="#4f5d75" stroke-width="0.8"/>
+        <text x="472" y="670" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Artifact</text>
+
+        <rect x="612" y="661" width="14" height="10" rx="2" fill="rgba(191,69,32,0.08)" stroke="#bf4520" stroke-width="0.8"/>
+        <text x="632" y="670" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Gate</text>
+
+        <line x1="752" y1="666" x2="782" y2="666" stroke="#4f5d75" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+        <text x="790" y="670" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Schedule path</text>
+
+        <line x1="982" y1="666" x2="1012" y2="666" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <text x="1020" y="670" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Full run</text>
+      </svg>
+    </div>
+
+    <div class="diagram-meta">
+      <span>FIVE JOBS · checkout → setup-go (go.mod, toolchain 1.27.3) → server/</span>
+      <span>SOURCE · .github/workflows/server-ci.yml</span>
+    </div>
+  </div>
+</body>
+</html>
