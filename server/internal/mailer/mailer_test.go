@@ -261,6 +261,16 @@ func TestGet(t *testing.T) {
 	t.Setenv("MONGO_MIN_POOL_SIZE", "0")
 	t.Setenv("MONGO_CONNECT_TIMEOUT", "10s")
 	t.Setenv("MONGO_PING_TIMEOUT", "10s")
+	t.Setenv("REDIS_ADDR", "localhost:5001")
+	t.Setenv("REDIS_USERNAME", "")
+	t.Setenv("REDIS_PASSWORD", "")
+	t.Setenv("REDIS_DB", "0")
+	t.Setenv("REDIS_POOL_SIZE", "10")
+	t.Setenv("REDIS_MIN_IDLE_CONNS", "0")
+	t.Setenv("REDIS_DIAL_TIMEOUT", "5s")
+	t.Setenv("REDIS_READ_TIMEOUT", "3s")
+	t.Setenv("REDIS_WRITE_TIMEOUT", "3s")
+	t.Setenv("REDIS_PING_TIMEOUT", "5s")
 
 	client1 := Get()
 	if client1 == nil {

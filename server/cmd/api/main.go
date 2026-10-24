@@ -66,6 +66,25 @@ func run() error {
 
 	log.Info("MongoDB connection established")
 
+	redisStore, err := database.NewRedis(context.Background(), cfg.RedisAddr, cfg.RedisUsername, cfg.RedisPassword, cfg.RedisDB, database.RedisOptions{
+		PoolSize:     cfg.RedisPoolSize,
+		MinIdleConns: cfg.RedisMinIdleConns,
+		DialTimeout:  cfg.RedisDialTimeout,
+		ReadTimeout:  cfg.RedisReadTimeout,
+		WriteTimeout: cfg.RedisWriteTimeout,
+		PingTimeout:  cfg.RedisPingTimeout,
+	})
+	if err != nil {
+		return fmt.Errorf("redis error: %w", err)
+	}
+	defer func() {
+		if err := redisStore.Close(); err != nil {
+			log.Error(fmt.Sprintf("failed to close Redis connection: %v", err))
+		}
+	}()
+
+	log.Info("Redis connection established")
+
 	if cfg.AppEnv == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	}

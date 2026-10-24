@@ -30,6 +30,16 @@ type Config struct {
 	MongoMinPoolSize    uint64
 	MongoConnectTimeout time.Duration
 	MongoPingTimeout    time.Duration
+	RedisAddr           string
+	RedisUsername       string
+	RedisPassword       string
+	RedisDB             int
+	RedisPoolSize       int
+	RedisMinIdleConns   int
+	RedisDialTimeout    time.Duration
+	RedisReadTimeout    time.Duration
+	RedisWriteTimeout   time.Duration
+	RedisPingTimeout    time.Duration
 }
 
 var (
@@ -130,6 +140,49 @@ func load() (*Config, error) {
 		return nil, err
 	}
 
+	redisAddr, err := loadRedisAddr()
+	if err != nil {
+		return nil, err
+	}
+
+	redisUsername := loadRedisUsername()
+	redisPassword := loadRedisPassword()
+
+	redisDB, err := loadRedisDB()
+	if err != nil {
+		return nil, err
+	}
+
+	redisPoolSize, err := loadRedisPoolSize()
+	if err != nil {
+		return nil, err
+	}
+
+	redisMinIdleConns, err := loadRedisMinIdleConns()
+	if err != nil {
+		return nil, err
+	}
+
+	redisDialTimeout, err := loadRedisDialTimeout()
+	if err != nil {
+		return nil, err
+	}
+
+	redisReadTimeout, err := loadRedisReadTimeout()
+	if err != nil {
+		return nil, err
+	}
+
+	redisWriteTimeout, err := loadRedisWriteTimeout()
+	if err != nil {
+		return nil, err
+	}
+
+	redisPingTimeout, err := loadRedisPingTimeout()
+	if err != nil {
+		return nil, err
+	}
+
 	return &Config{
 		Port:                port,
 		AppEnv:              appEnv,
@@ -147,6 +200,16 @@ func load() (*Config, error) {
 		MongoMinPoolSize:    mongoMinPoolSize,
 		MongoConnectTimeout: mongoConnectTimeout,
 		MongoPingTimeout:    mongoPingTimeout,
+		RedisAddr:           redisAddr,
+		RedisUsername:       redisUsername,
+		RedisPassword:       redisPassword,
+		RedisDB:             redisDB,
+		RedisPoolSize:       redisPoolSize,
+		RedisMinIdleConns:   redisMinIdleConns,
+		RedisDialTimeout:    redisDialTimeout,
+		RedisReadTimeout:    redisReadTimeout,
+		RedisWriteTimeout:   redisWriteTimeout,
+		RedisPingTimeout:    redisPingTimeout,
 	}, nil
 }
 
@@ -198,6 +261,35 @@ func requireDuration(key string) (time.Duration, error) {
 	}
 	if val <= 0 {
 		return 0, fmt.Errorf("invalid %s %q: must be greater than zero", key, raw)
+	}
+
+	return val, nil
+}
+
+func requireNonNegativeInt(key string) (int, error) {
+	raw := os.Getenv(key)
+	if raw == "" {
+		return 0, fmt.Errorf("missing %s", key)
+	}
+
+	val, err := strconv.Atoi(raw)
+	if err != nil {
+		return 0, fmt.Errorf("invalid %s %q: not an integer", key, raw)
+	}
+	if val < 0 {
+		return 0, fmt.Errorf("invalid %s %d: must not be negative", key, val)
+	}
+
+	return val, nil
+}
+
+func requirePositiveInt(key string) (int, error) {
+	val, err := requireNonNegativeInt(key)
+	if err != nil {
+		return 0, err
+	}
+	if val == 0 {
+		return 0, fmt.Errorf("invalid %s: must be greater than zero", key)
 	}
 
 	return val, nil
@@ -304,4 +396,44 @@ func loadMongoConnectTimeout() (time.Duration, error) {
 
 func loadMongoPingTimeout() (time.Duration, error) {
 	return requireDuration("MONGO_PING_TIMEOUT")
+}
+
+func loadRedisAddr() (string, error) {
+	return requireString("REDIS_ADDR")
+}
+
+func loadRedisUsername() string {
+	return os.Getenv("REDIS_USERNAME")
+}
+
+func loadRedisPassword() string {
+	return os.Getenv("REDIS_PASSWORD")
+}
+
+func loadRedisDB() (int, error) {
+	return requireNonNegativeInt("REDIS_DB")
+}
+
+func loadRedisPoolSize() (int, error) {
+	return requirePositiveInt("REDIS_POOL_SIZE")
+}
+
+func loadRedisMinIdleConns() (int, error) {
+	return requireNonNegativeInt("REDIS_MIN_IDLE_CONNS")
+}
+
+func loadRedisDialTimeout() (time.Duration, error) {
+	return requireDuration("REDIS_DIAL_TIMEOUT")
+}
+
+func loadRedisReadTimeout() (time.Duration, error) {
+	return requireDuration("REDIS_READ_TIMEOUT")
+}
+
+func loadRedisWriteTimeout() (time.Duration, error) {
+	return requireDuration("REDIS_WRITE_TIMEOUT")
+}
+
+func loadRedisPingTimeout() (time.Duration, error) {
+	return requireDuration("REDIS_PING_TIMEOUT")
 }
