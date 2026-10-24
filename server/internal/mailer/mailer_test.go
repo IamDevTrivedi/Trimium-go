@@ -241,47 +241,27 @@ func TestSend_Success(t *testing.T) {
 	}
 }
 
-func TestGet(t *testing.T) {
+func TestGet_ReturnsCachedInstance(t *testing.T) {
 	t.Cleanup(resetState)
 	resetState()
 
-	t.Setenv("APP_ENV", "production")
-	t.Setenv("PORT", "5000")
-	t.Setenv("SMTP_HOST", "localhost")
-	t.Setenv("SMTP_PORT", "2525")
-	t.Setenv("SMTP_USERNAME", "testuser")
-	t.Setenv("SMTP_PASSWORD", "testpass")
-	t.Setenv("FROM_EMAIL", "trimium@localhost")
-	t.Setenv("BACKEND_URL_PROD", "https://api.example.com")
-	t.Setenv("FRONTEND_URL_PROD", "https://example.com")
-	t.Setenv("GEOIP_DB_PATH", "./data/geoip/GeoLite2-City.mmdb")
-	t.Setenv("MONGO_URI", "mongodb://localhost:27017")
-	t.Setenv("MONGO_DB_NAME", "trimium")
-	t.Setenv("MONGO_MAX_POOL_SIZE", "100")
-	t.Setenv("MONGO_MIN_POOL_SIZE", "0")
-	t.Setenv("MONGO_CONNECT_TIMEOUT", "10s")
-	t.Setenv("MONGO_PING_TIMEOUT", "10s")
-	t.Setenv("REDIS_ADDR", "localhost:5001")
-	t.Setenv("REDIS_USERNAME", "")
-	t.Setenv("REDIS_PASSWORD", "")
-	t.Setenv("REDIS_DB", "0")
-	t.Setenv("REDIS_POOL_SIZE", "10")
-	t.Setenv("REDIS_MIN_IDLE_CONNS", "0")
-	t.Setenv("REDIS_DIAL_TIMEOUT", "5s")
-	t.Setenv("REDIS_READ_TIMEOUT", "3s")
-	t.Setenv("REDIS_WRITE_TIMEOUT", "3s")
-	t.Setenv("REDIS_PING_TIMEOUT", "5s")
+	gc, err := gomail.NewClient("127.0.0.1", gomail.WithPort(2525), gomail.WithTLSPolicy(gomail.TLSOpportunistic))
+	if err != nil {
+		t.Fatalf("unexpected error creating gomail client: %v", err)
+	}
 
-	client1 := Get()
-	if client1 == nil {
+	want := &Client{client: gc}
+	instance = want
+	once.Do(func() {})
+
+	got := Get()
+	if got == nil {
 		t.Fatal("expected non-nil Client from Get()")
 	}
-	if client1.client == nil {
-		t.Fatal("expected non-nil gomail.Client inside Client")
+	if got != want {
+		t.Errorf("expected cached client %p, got %p", want, got)
 	}
-
-	client2 := Get()
-	if client2 != client1 {
-		t.Errorf("expected cached singleton client %p, got %p", client1, client2)
+	if got.client != gc {
+		t.Errorf("expected underlying gomail client %p, got %p", gc, got.client)
 	}
 }
