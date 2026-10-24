@@ -3,6 +3,7 @@ package main
 import (
 	"archive/tar"
 	"compress/gzip"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,7 +14,13 @@ import (
 	"time"
 )
 
-const editionID = "GeoLite2-City"
+const (
+	editionID = "GeoLite2-City"
+
+	// maxMMDBFileSize bounds how much data is extracted from the archive so a
+	// malicious or corrupted download cannot exhaust disk space.
+	maxMMDBFileSize = int64(512 << 20) // 512 MiB
+)
 
 func main() {
 	if err := run(); err != nil {
@@ -29,9 +36,9 @@ func run() error {
 		return fmt.Errorf("MAXMIND_LICENSE_KEY environment variable is not set")
 	}
 
-	targetFile := os.Getenv("GEOIP_DB_PATH")
-	if targetFile == "" {
-		targetFile = filepath.Join("data", "geoip", editionID+".mmdb")
+	targetFile, err := targetPath()
+	if err != nil {
+		return err
 	}
 
 	q := url.Values{}
@@ -40,8 +47,13 @@ func run() error {
 	q.Set("suffix", "tar.gz")
 	downloadURL := "https://download.maxmind.com/app/geoip_download?" + q.Encode()
 
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, downloadURL, nil)
+	if err != nil {
+		return fmt.Errorf("build download request: %w", sanitize(err, key))
+	}
+
 	client := &http.Client{Timeout: 5 * time.Minute}
-	resp, err := client.Get(downloadURL)
+	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("download failed: %w", sanitize(err, key))
 	}
@@ -56,13 +68,14 @@ func run() error {
 	}
 	defer gz.Close()
 
-	if err := os.MkdirAll(filepath.Dir(targetFile), 0o755); err != nil {
+	dir := filepath.Dir(targetFile)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
 
 	// Write to a temp file in the same dir, then atomically rename,
 	// so a running app never sees a half-written DB.
-	tmp, err := os.CreateTemp(filepath.Dir(targetFile), ".geoip-*.tmp")
+	tmp, err := os.CreateTemp(dir, ".geoip-*.tmp")
 	if err != nil {
 		return err
 	}
@@ -81,9 +94,14 @@ func run() error {
 			return fmt.Errorf("tar: %w", err)
 		}
 		if hdr.Typeflag == tar.TypeReg && strings.HasSuffix(hdr.Name, ".mmdb") {
-			if _, err := io.Copy(tmp, tr); err != nil {
+			written, err := io.Copy(tmp, io.LimitReader(tr, maxMMDBFileSize+1))
+			if err != nil {
 				tmp.Close()
-				return err
+				return fmt.Errorf("extract MMDB file: %w", err)
+			}
+			if written > maxMMDBFileSize {
+				tmp.Close()
+				return fmt.Errorf("extracted MMDB file exceeds the %d byte limit", maxMMDBFileSize)
 			}
 			found = true
 			break
@@ -97,6 +115,21 @@ func run() error {
 	}
 
 	return os.Rename(tmpName, targetFile)
+}
+
+// targetPath returns the operator-configured destination for the database.
+func targetPath() (string, error) {
+	raw := os.Getenv("GEOIP_DB_PATH")
+	if raw == "" {
+		return "", fmt.Errorf("GEOIP_DB_PATH environment variable is not set")
+	}
+
+	cleaned := filepath.Clean(raw)
+	if cleaned == "." || cleaned == string(filepath.Separator) {
+		return "", fmt.Errorf("invalid GEOIP_DB_PATH %q: must point to a file", raw)
+	}
+
+	return cleaned, nil
 }
 
 // sanitize strips the license key from URL errors so it never hits logs.
