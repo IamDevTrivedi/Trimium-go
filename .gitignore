@@ -1,3 +1,4 @@
+# Ignore environment files, except for the example file
 **/.env*
 !**/.env.example
 
@@ -10,3 +11,6 @@ server/tmp/
 
 # Agent skills (restore with `npx skills install`)
 .agents/
+
+# tmp files 
+**/*.tmp
