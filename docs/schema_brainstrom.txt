@@ -1,0 +1,28 @@
+_id            ObjectId
+first_name     string   (non-empty)
+last_name      string   (non-empty)
+email          string   (lowercased, trimmed, regex-validated; UNIQUE index)
+password_hash  string   (argon2id; salt and params embedded)
+created_at     int      (epoch ms)
+updated_at     int      (epoch ms)
+
+_id                  ObjectId     (the "sid")
+user_id              ObjectId     (-> users._id)
+useragent            object       { raw, browser, os, device_type }
+ip                   string       (login IP)
+geolocation          object       { country, city }
+status               string       (active | revoked)
+absolute_expires_at  int          (hard cap, epoch ms)
+created_at           int          (login time)
+last_active_at       int          (updated on each successful refresh)
+revoked_at           int | null
+revoked_reason       string | null
+                     (logout | user_revoked | reuse_detected | password_change | admin | evicted)
+
+_id          ObjectId
+session_id   ObjectId        (-> sessions._id)
+token_hash   string          (SHA-256 hex of the raw token; UNIQUE index)
+created_at   int
+expires_at   int             (min(created_at + TOKEN_TTL, session.absolute_expires_at))
+used_at      int | null      (null = current live token; non-null = spent)
+replaced_by  ObjectId | null (successor token; audit only)
