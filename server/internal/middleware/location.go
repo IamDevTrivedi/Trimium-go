@@ -28,9 +28,13 @@ type GeoResolver struct {
 	db *geoip2.Reader
 }
 
+type GeoResolverConfig struct {
+	DBPath string
+}
+
 // NewGeoResolver opens the mmdb once at startup. Close it on shutdown.
-func NewGeoResolver(dbPath string) (*GeoResolver, error) {
-	db, err := geoip2.Open(dbPath)
+func NewGeoResolver(config GeoResolverConfig) (*GeoResolver, error) {
+	db, err := geoip2.Open(config.DBPath)
 	if err != nil {
 		return nil, err
 	}

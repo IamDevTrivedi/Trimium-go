@@ -91,7 +91,9 @@ func run() error {
 
 	router := gin.New()
 
-	geo, err := middleware.NewGeoResolver("./data/geoip/GeoLite2-City.mmdb")
+	geo, err := middleware.NewGeoResolver(middleware.GeoResolverConfig{
+		DBPath: "./data/geoip/GeoLite2-City.mmdb",
+	})
 	if err != nil {
 		return fmt.Errorf("failed to initialize GeoResolver: %w", err)
 	}
