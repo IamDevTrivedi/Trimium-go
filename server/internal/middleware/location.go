@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"fmt"
 	"net"
 
 	"github.com/gin-gonic/gin"
@@ -32,8 +31,6 @@ type GeoResolver struct {
 // NewGeoResolver opens the mmdb once at startup. Close it on shutdown.
 func NewGeoResolver(dbPath string) (*GeoResolver, error) {
 	db, err := geoip2.Open(dbPath)
-	fmt.Println("aaa")
-	fmt.Println("bbb")
 	if err != nil {
 		return nil, err
 	}
