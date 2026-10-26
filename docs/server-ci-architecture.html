@@ -88,12 +88,12 @@
   <div class="frame">
     <p class="eyebrow">CI · GitHub Actions</p>
     <h1>How Server CI runs</h1>
-    <p class="subtitle">Triggers, GitHub-hosted runners, and the aggregator that protects main.</p>
+    <p class="subtitle">Triggers, Ubuntu GitHub-hosted runners, and the aggregator that protects main.</p>
 
     <div class="diagram-container">
       <svg viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="server-ci-architecture-title server-ci-architecture-desc">
         <title id="server-ci-architecture-title">Server CI workflow architecture</title>
-        <desc id="server-ci-architecture-desc">Architecture of the Server CI workflow: pull requests, pushes to main, manual runs, and a nightly schedule feed five jobs on GitHub-hosted runners, which report to the CI gate that protects main.</desc>
+        <desc id="server-ci-architecture-desc">Architecture of the Server CI workflow: pull requests, pushes to main, manual runs, and a nightly schedule feed five jobs on Ubuntu GitHub-hosted runners, which report to the CI gate that protects main.</desc>
         <defs>
           <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
             <polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/>
@@ -198,12 +198,12 @@
         <rect x="780" y="228" width="200" height="200" rx="6" fill="#f5f5f5"/>
         <rect x="780" y="228" width="200" height="200" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
         <rect x="788" y="234" width="84" height="12" rx="2" fill="transparent" stroke="rgba(45,49,66,0.40)" stroke-width="0.8"/>
-        <text x="830" y="243" fill="#5a6580" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">MATRIX · 3 LEGS</text>
+        <text x="830" y="243" fill="#5a6580" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">UBUNTU-LATEST</text>
         <text x="880" y="274" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Build</text>
         <line x1="792" y1="292" x2="968" y2="292" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
         <text x="796" y="316" fill="#2d3142" font-size="9" font-family="'Geist Mono', monospace">go build ./...</text>
-        <text x="796" y="334" fill="#2d3142" font-size="9" font-family="'Geist Mono', monospace">ubuntu · macOS</text>
-        <text x="796" y="352" fill="#2d3142" font-size="9" font-family="'Geist Mono', monospace">Windows</text>
+        <text x="796" y="334" fill="#2d3142" font-size="9" font-family="'Geist Mono', monospace">linux/amd64 target</text>
+        <text x="796" y="352" fill="#2d3142" font-size="9" font-family="'Geist Mono', monospace">single runner</text>
         <line x1="792" y1="396" x2="968" y2="396" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
         <text x="796" y="416" fill="#5a6580" font-size="7" font-family="'Geist Mono', monospace" letter-spacing="0.08em">PR · PUSH · MANUAL</text>
 
