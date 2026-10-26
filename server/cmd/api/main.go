@@ -104,6 +104,7 @@ func run() error {
 		middleware.RequestLogger(),
 		middleware.RequestUserAgent(),
 		middleware.RequestGeo(geo),
+		middleware.RateLimiter(100, 60_000, middleware.GetRequestIP),
 	)
 
 	rootService := root.NewService()
