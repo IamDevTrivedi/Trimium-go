@@ -106,7 +106,16 @@ func run() error {
 		middleware.RequestLogger(),
 		middleware.RequestUserAgent(),
 		middleware.RequestGeo(geo),
-		middleware.RateLimiter(100, 60_000, middleware.GetRequestIP),
+		middleware.RateLimiter(
+			middleware.RateLimiterConfig{
+				Client: redisStore.Client(),
+				Limit:  10,
+				Window: time.Minute,
+				KeyGen: func(c *gin.Context) string {
+					return c.ClientIP()
+				},
+			},
+		),
 	)
 
 	rootService := root.NewService()
