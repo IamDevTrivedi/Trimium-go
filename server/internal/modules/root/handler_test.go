@@ -100,7 +100,7 @@ func TestHandler_HandleRoot(t *testing.T) {
 			router := gin.New()
 			RegisterRoutes(router, rateLimiter, NewHandler(&mockService{data: tt.data, err: tt.err}))
 
-			req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
+			req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/", nil)
 			w := httptest.NewRecorder()
 			router.ServeHTTP(w, req)
 
@@ -142,7 +142,7 @@ func TestRegisterRoutes_OnlyRootPathIsRegistered(t *testing.T) {
 	if len(routes) != 1 {
 		t.Fatalf("expected 1 registered route, got %d", len(routes))
 	}
-	if routes[0].Method != http.MethodGet || routes[0].Path != "/" {
-		t.Errorf("expected GET /, got %s %s", routes[0].Method, routes[0].Path)
+	if routes[0].Method != http.MethodGet || routes[0].Path != "/api/v1/" {
+		t.Errorf("expected GET /api/v1/, got %s %s", routes[0].Method, routes[0].Path)
 	}
 }
