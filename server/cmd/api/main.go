@@ -123,9 +123,10 @@ func run() error {
 	rootHandler := root.NewHandler(rootService)
 	root.RegisterRoutes(router, rootRateLimiter, rootHandler)
 
+	healthRateLimiter := health.NewRateLimiter(redisStore)
 	healthService := health.NewService()
 	healthHandler := health.NewHandler(healthService)
-	health.RegisterRoutes(router, healthHandler)
+	health.RegisterRoutes(router, healthRateLimiter, healthHandler)
 
 	srv := &http.Server{
 		Addr:              fmt.Sprintf(":%d", cfg.Port),
