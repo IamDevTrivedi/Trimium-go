@@ -10,22 +10,20 @@ import (
 )
 
 type RateLimiter struct {
-	limiter gin.HandlerFunc
+	RedisStore *database.Redis
 }
 
 func NewRateLimiter(redisStore *database.Redis) *RateLimiter {
-	return &RateLimiter{
-		limiter: middleware.RateLimiter(middleware.RateLimiterConfig{
-			Client: redisStore.Client(),
-			Limit:  5,
-			Window: time.Minute,
-			KeyGen: func(c *gin.Context) string {
-				return middleware.GetRequestIP(c)
-			},
-		}),
-	}
+	return &RateLimiter{RedisStore: redisStore}
 }
 
-func (r *RateLimiter) HealthRateLimiter(c *gin.Context) {
-	r.limiter(c)
+func (r *RateLimiter) HealthRateLimiter() gin.HandlerFunc {
+	return middleware.RateLimiter(middleware.RateLimiterConfig{
+		Client: r.RedisStore.Client(),
+		Limit:  5,
+		Window: time.Minute,
+		KeyGen: func(c *gin.Context) string {
+			return middleware.GetRequestIP(c)
+		},
+	})
 }

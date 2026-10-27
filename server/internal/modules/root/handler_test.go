@@ -1,6 +1,7 @@
 package root
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -8,9 +9,12 @@ import (
 	"os"
 	"reflect"
 	"testing"
+	"time"
 
+	"github.com/alicebob/miniredis/v2"
 	"github.com/gin-gonic/gin"
 
+	"server/internal/database"
 	"server/internal/response"
 )
 
@@ -23,6 +27,29 @@ type mockService struct {
 
 func (m *mockService) GetStatus() (map[string]any, error) {
 	return m.data, m.err
+}
+
+func newTestRateLimiter(t *testing.T) *RateLimiter {
+	t.Helper()
+	mr := miniredis.RunT(t)
+
+	store, err := database.NewRedis(context.Background(), mr.Addr(), "", "", 0, database.RedisOptions{
+		PoolSize:     5,
+		MinIdleConns: 1,
+		DialTimeout:  time.Second,
+		ReadTimeout:  time.Second,
+		WriteTimeout: time.Second,
+		PingTimeout:  time.Second,
+	})
+	if err != nil {
+		t.Fatalf("failed to create redis test store: %v", err)
+	}
+
+	t.Cleanup(func() {
+		_ = store.Close()
+	})
+
+	return NewRateLimiter(store)
 }
 
 func TestMain(m *testing.M) {
@@ -69,8 +96,9 @@ func TestHandler_HandleRoot(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			rateLimiter := newTestRateLimiter(t)
 			router := gin.New()
-			RegisterRoutes(router, NewHandler(&mockService{data: tt.data, err: tt.err}))
+			RegisterRoutes(router, rateLimiter, NewHandler(&mockService{data: tt.data, err: tt.err}))
 
 			req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 			w := httptest.NewRecorder()
@@ -106,8 +134,9 @@ func TestHandler_HandleRoot(t *testing.T) {
 }
 
 func TestRegisterRoutes_OnlyRootPathIsRegistered(t *testing.T) {
+	rateLimiter := newTestRateLimiter(t)
 	router := gin.New()
-	RegisterRoutes(router, NewHandler(&mockService{}))
+	RegisterRoutes(router, rateLimiter, NewHandler(&mockService{}))
 
 	routes := router.Routes()
 	if len(routes) != 1 {
