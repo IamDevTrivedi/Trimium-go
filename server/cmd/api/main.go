@@ -109,7 +109,7 @@ func run() error {
 		middleware.RateLimiter(
 			middleware.RateLimiterConfig{
 				Client: redisStore.Client(),
-				Limit:  10,
+				Limit:  1000,
 				Window: time.Minute,
 				KeyGen: func(c *gin.Context) string {
 					return middleware.GetRequestIP(c)
