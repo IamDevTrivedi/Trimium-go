@@ -111,9 +111,7 @@ func run() error {
 				Client: redisStore.Client(),
 				Limit:  1000,
 				Window: time.Minute,
-				KeyGen: func(c *gin.Context) string {
-					return middleware.GetRequestIP(c)
-				},
+				KeyGen: middleware.GetRequestIP,
 			},
 		),
 	)

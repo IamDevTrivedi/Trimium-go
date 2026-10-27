@@ -22,8 +22,6 @@ func (r *RateLimiter) HealthRateLimiter() gin.HandlerFunc {
 		Client: r.RedisStore.Client(),
 		Limit:  5,
 		Window: time.Minute,
-		KeyGen: func(c *gin.Context) string {
-			return middleware.GetRequestIP(c)
-		},
+		KeyGen: middleware.GetRequestIP,
 	})
 }
