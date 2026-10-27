@@ -1,1 +1,79 @@
-<result of tree>
+.
+├── .github
+│   └── workflows
+│       ├── codeql.yml
+│       ├── directory-structure.yml
+│       └── server-ci.yml
+├── .gitignore
+├── README.md
+├── client
+│   └── .gitkeep
+├── docs
+│   ├── .gitkeep
+│   ├── DIRECTORY_STRUCTURE.txt
+│   ├── schema_brainstrom.txt
+│   └── server-ci-architecture.html
+├── server
+│   ├── .air.toml
+│   ├── .gitkeep
+│   ├── .golangci.yml
+│   ├── Makefile
+│   ├── cmd
+│   │   ├── api
+│   │   │   └── main.go
+│   │   └── geoipupdate
+│   │       └── main.go
+│   ├── data
+│   │   └── geoip
+│   │       └── .gitkeep
+│   ├── docker-compose.dev.yml
+│   ├── go.mod
+│   ├── go.sum
+│   └── internal
+│       ├── config
+│       │   ├── config.go
+│       │   └── config_test.go
+│       ├── database
+│       │   ├── mongo.go
+│       │   ├── mongo_test.go
+│       │   ├── redis.go
+│       │   └── redis_test.go
+│       ├── logger
+│       │   ├── logger.go
+│       │   └── logger_test.go
+│       ├── mailer
+│       │   ├── mailer.go
+│       │   └── mailer_test.go
+│       ├── middleware
+│       │   ├── httplogger.go
+│       │   ├── httplogger_test.go
+│       │   ├── ip.go
+│       │   ├── ip_test.go
+│       │   ├── location.go
+│       │   ├── ratelimiter.go
+│       │   ├── ratelimiter_test.go
+│       │   ├── requestid.go
+│       │   ├── requestid_test.go
+│       │   ├── useragent.go
+│       │   └── useragent_test.go
+│       ├── modules
+│       │   ├── health
+│       │   │   ├── handler.go
+│       │   │   ├── handler_test.go
+│       │   │   ├── ratelimiter.go
+│       │   │   ├── route.go
+│       │   │   ├── service.go
+│       │   │   └── service_test.go
+│       │   └── root
+│       │       ├── handler.go
+│       │       ├── handler_test.go
+│       │       ├── ratelimiter.go
+│       │       ├── route.go
+│       │       ├── service.go
+│       │       └── service_test.go
+│       └── response
+│           ├── response.go
+│           └── response_test.go
+└── skills-lock.json
+
+21 directories, 56 files
