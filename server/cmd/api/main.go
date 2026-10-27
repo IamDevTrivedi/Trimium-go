@@ -118,9 +118,10 @@ func run() error {
 		),
 	)
 
+	rootRateLimiter := root.NewRateLimiter(redisStore)
 	rootService := root.NewService()
 	rootHandler := root.NewHandler(rootService)
-	root.RegisterRoutes(router, rootHandler)
+	root.RegisterRoutes(router, rootRateLimiter, rootHandler)
 
 	healthService := health.NewService()
 	healthHandler := health.NewHandler(healthService)
