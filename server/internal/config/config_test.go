@@ -508,23 +508,23 @@ func TestLoadMongoPingTimeout(t *testing.T) {
 	}
 }
 
-func TestLoadRedisAddr(t *testing.T) {
+func TestLoadRedisURI(t *testing.T) {
 	tests := []struct {
 		name      string
 		value     string
 		want      string
 		expectErr bool
 	}{
-		{"valid address", "localhost:5001", "localhost:5001", false},
-		{"valid hostname", "redis:6379", "redis:6379", false},
-		{"empty address", "", "", true},
+		{"valid redis uri", "redis://localhost:5001", "redis://localhost:5001", false},
+		{"valid redis uri with auth and db", "redis://user:pass@redis:6379/1", "redis://user:pass@redis:6379/1", false},
+		{"empty redis uri", "", "", true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv("REDIS_ADDR", tt.value)
+			t.Setenv("REDIS_URI", tt.value)
 
-			got, err := loadRedisAddr()
+			got, err := loadRedisURI()
 			if tt.expectErr && err == nil {
 				t.Fatalf("expected error, got nil")
 			}
@@ -533,80 +533,6 @@ func TestLoadRedisAddr(t *testing.T) {
 			}
 			if got != tt.want {
 				t.Errorf("got %q, want %q", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestLoadRedisUsername(t *testing.T) {
-	tests := []struct {
-		name  string
-		value string
-		want  string
-	}{
-		{"value set", "redis-user", "redis-user"},
-		{"empty allowed", "", ""},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv("REDIS_USERNAME", tt.value)
-
-			if got := loadRedisUsername(); got != tt.want {
-				t.Errorf("got %q, want %q", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestLoadRedisPassword(t *testing.T) {
-	tests := []struct {
-		name  string
-		value string
-		want  string
-	}{
-		{"value set", "redis-pass", "redis-pass"},
-		{"empty allowed", "", ""},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv("REDIS_PASSWORD", tt.value)
-
-			if got := loadRedisPassword(); got != tt.want {
-				t.Errorf("got %q, want %q", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestLoadRedisDB(t *testing.T) {
-	tests := []struct {
-		name      string
-		value     string
-		want      int
-		expectErr bool
-	}{
-		{"zero db", "0", 0, false},
-		{"valid db", "2", 2, false},
-		{"missing", "", 0, true},
-		{"invalid non-numeric", "abc", 0, true},
-		{"invalid negative", "-1", 0, true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv("REDIS_DB", tt.value)
-
-			got, err := loadRedisDB()
-			if tt.expectErr && err == nil {
-				t.Fatalf("expected error, got nil")
-			}
-			if !tt.expectErr && err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if got != tt.want {
-				t.Errorf("got %d, want %d", got, tt.want)
 			}
 		})
 	}
@@ -804,10 +730,7 @@ func TestGet(t *testing.T) {
 		t.Setenv("MONGO_MIN_POOL_SIZE", "0")
 		t.Setenv("MONGO_CONNECT_TIMEOUT", "10s")
 		t.Setenv("MONGO_PING_TIMEOUT", "10s")
-		t.Setenv("REDIS_ADDR", "localhost:5001")
-		t.Setenv("REDIS_USERNAME", "")
-		t.Setenv("REDIS_PASSWORD", "")
-		t.Setenv("REDIS_DB", "0")
+		t.Setenv("REDIS_URI", "redis://localhost:5001")
 		t.Setenv("REDIS_POOL_SIZE", "10")
 		t.Setenv("REDIS_MIN_IDLE_CONNS", "0")
 		t.Setenv("REDIS_DIAL_TIMEOUT", "5s")
@@ -845,10 +768,8 @@ func TestGet(t *testing.T) {
 		t.Setenv("MONGO_MIN_POOL_SIZE", "5")
 		t.Setenv("MONGO_CONNECT_TIMEOUT", "3s")
 		t.Setenv("MONGO_PING_TIMEOUT", "2s")
-		t.Setenv("REDIS_ADDR", "localhost:5001")
-		t.Setenv("REDIS_USERNAME", "redis-user")
-		t.Setenv("REDIS_PASSWORD", "redis-pass")
-		t.Setenv("REDIS_DB", "2")
+		wantRedisURI := "redis://localhost:5001/2"
+		t.Setenv("REDIS_URI", wantRedisURI)
 		t.Setenv("REDIS_POOL_SIZE", "20")
 		t.Setenv("REDIS_MIN_IDLE_CONNS", "5")
 		t.Setenv("REDIS_DIAL_TIMEOUT", "4s")
@@ -911,17 +832,8 @@ func TestGet(t *testing.T) {
 		if cfg1.MongoPingTimeout != 2*time.Second {
 			t.Errorf("got mongoPingTimeout %v, want 2s", cfg1.MongoPingTimeout)
 		}
-		if cfg1.RedisAddr != "localhost:5001" {
-			t.Errorf("got redisAddr %q, want localhost:5001", cfg1.RedisAddr)
-		}
-		if cfg1.RedisUsername != "redis-user" {
-			t.Errorf("got redisUsername %q, want redis-user", cfg1.RedisUsername)
-		}
-		if cfg1.RedisPassword != "redis-pass" {
-			t.Errorf("got redisPassword %q, want redis-pass", cfg1.RedisPassword)
-		}
-		if cfg1.RedisDB != 2 {
-			t.Errorf("got redisDB %d, want 2", cfg1.RedisDB)
+		if cfg1.RedisURI != wantRedisURI {
+			t.Errorf("got redisURI %q, want %q", cfg1.RedisURI, wantRedisURI)
 		}
 		if cfg1.RedisPoolSize != 20 {
 			t.Errorf("got redisPoolSize %d, want 20", cfg1.RedisPoolSize)
@@ -985,10 +897,7 @@ func TestGet(t *testing.T) {
 		t.Setenv("MONGO_MIN_POOL_SIZE", "0")
 		t.Setenv("MONGO_CONNECT_TIMEOUT", "10s")
 		t.Setenv("MONGO_PING_TIMEOUT", "10s")
-		t.Setenv("REDIS_ADDR", "localhost:5001")
-		t.Setenv("REDIS_USERNAME", "")
-		t.Setenv("REDIS_PASSWORD", "")
-		t.Setenv("REDIS_DB", "0")
+		t.Setenv("REDIS_URI", "redis://localhost:5001")
 		t.Setenv("REDIS_POOL_SIZE", "10")
 		t.Setenv("REDIS_MIN_IDLE_CONNS", "0")
 		t.Setenv("REDIS_DIAL_TIMEOUT", "5s")
@@ -1026,10 +935,7 @@ func TestGet(t *testing.T) {
 		t.Setenv("MONGO_MIN_POOL_SIZE", "0")
 		t.Setenv("MONGO_CONNECT_TIMEOUT", "10s")
 		t.Setenv("MONGO_PING_TIMEOUT", "10s")
-		t.Setenv("REDIS_ADDR", "localhost:5001")
-		t.Setenv("REDIS_USERNAME", "")
-		t.Setenv("REDIS_PASSWORD", "")
-		t.Setenv("REDIS_DB", "0")
+		t.Setenv("REDIS_URI", "redis://localhost:5001")
 		t.Setenv("REDIS_POOL_SIZE", "10")
 		t.Setenv("REDIS_MIN_IDLE_CONNS", "0")
 		t.Setenv("REDIS_DIAL_TIMEOUT", "5s")

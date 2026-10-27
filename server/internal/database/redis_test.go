@@ -18,22 +18,22 @@ func validRedisOptions() RedisOptions {
 	}
 }
 
-func TestNewRedisRequiresAddr(t *testing.T) {
-	_, err := NewRedis(context.Background(), "", "", "", 0, validRedisOptions())
+func TestNewRedisRequiresURI(t *testing.T) {
+	_, err := NewRedis(context.Background(), "", validRedisOptions())
 	if err == nil {
-		t.Fatal("expected error for empty addr, got nil")
+		t.Fatal("expected error for empty uri, got nil")
 	}
-	if !strings.Contains(err.Error(), "addr is required") {
+	if !strings.Contains(err.Error(), "uri is required") {
 		t.Errorf("unexpected error: %v", err)
 	}
 }
 
-func TestNewRedisRejectsNegativeDB(t *testing.T) {
-	_, err := NewRedis(context.Background(), "localhost:6379", "", "", -1, validRedisOptions())
+func TestNewRedisRejectsInvalidURI(t *testing.T) {
+	_, err := NewRedis(context.Background(), "invalid-uri", validRedisOptions())
 	if err == nil {
-		t.Fatal("expected error for negative db, got nil")
+		t.Fatal("expected error for invalid uri, got nil")
 	}
-	if !strings.Contains(err.Error(), "cannot be negative") {
+	if !strings.Contains(err.Error(), "invalid uri") {
 		t.Errorf("unexpected error: %v", err)
 	}
 }
@@ -52,7 +52,7 @@ func TestNewRedisRejectsInvalidPoolSize(t *testing.T) {
 			opts := validRedisOptions()
 			opts.PoolSize = tt.poolSize
 
-			_, err := NewRedis(context.Background(), "localhost:6379", "", "", 0, opts)
+			_, err := NewRedis(context.Background(), "redis://localhost:6379", opts)
 			if err == nil {
 				t.Fatal("expected error, got nil")
 			}
@@ -78,7 +78,7 @@ func TestNewRedisRejectsInvalidMinIdleConns(t *testing.T) {
 			opts := validRedisOptions()
 			opts.MinIdleConns = tt.minIdleConns
 
-			_, err := NewRedis(context.Background(), "localhost:6379", "", "", 0, opts)
+			_, err := NewRedis(context.Background(), "redis://localhost:6379", opts)
 			if err == nil {
 				t.Fatal("expected error, got nil")
 			}
@@ -110,7 +110,7 @@ func TestNewRedisRejectsInvalidTimeouts(t *testing.T) {
 			opts := validRedisOptions()
 			tt.mutate(&opts)
 
-			_, err := NewRedis(context.Background(), "localhost:6379", "", "", 0, opts)
+			_, err := NewRedis(context.Background(), "redis://localhost:6379", opts)
 			if err == nil {
 				t.Fatal("expected error, got nil")
 			}

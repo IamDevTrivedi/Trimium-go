@@ -66,7 +66,7 @@ func run() error {
 
 	log.Info("MongoDB connection established")
 
-	redisStore, err := database.NewRedis(context.Background(), cfg.RedisAddr, cfg.RedisUsername, cfg.RedisPassword, cfg.RedisDB, database.RedisOptions{
+	redisStore, err := database.NewRedis(context.Background(), cfg.RedisURI, database.RedisOptions{
 		PoolSize:     cfg.RedisPoolSize,
 		MinIdleConns: cfg.RedisMinIdleConns,
 		DialTimeout:  cfg.RedisDialTimeout,

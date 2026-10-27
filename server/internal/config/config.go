@@ -30,10 +30,7 @@ type Config struct {
 	MongoMinPoolSize    uint64
 	MongoConnectTimeout time.Duration
 	MongoPingTimeout    time.Duration
-	RedisAddr           string
-	RedisUsername       string
-	RedisPassword       string
-	RedisDB             int
+	RedisURI            string
 	RedisPoolSize       int
 	RedisMinIdleConns   int
 	RedisDialTimeout    time.Duration
@@ -133,15 +130,7 @@ func load() (*Config, error) {
 		return nil, err
 	}
 
-	redisAddr, err := loadRedisAddr()
-	if err != nil {
-		return nil, err
-	}
-
-	redisUsername := loadRedisUsername()
-	redisPassword := loadRedisPassword()
-
-	redisDB, err := loadRedisDB()
+	redisURI, err := loadRedisURI()
 	if err != nil {
 		return nil, err
 	}
@@ -193,10 +182,7 @@ func load() (*Config, error) {
 		MongoMinPoolSize:    mongoMinPoolSize,
 		MongoConnectTimeout: mongoConnectTimeout,
 		MongoPingTimeout:    mongoPingTimeout,
-		RedisAddr:           redisAddr,
-		RedisUsername:       redisUsername,
-		RedisPassword:       redisPassword,
-		RedisDB:             redisDB,
+		RedisURI:            redisURI,
 		RedisPoolSize:       redisPoolSize,
 		RedisMinIdleConns:   redisMinIdleConns,
 		RedisDialTimeout:    redisDialTimeout,
@@ -391,20 +377,8 @@ func loadMongoPingTimeout() (time.Duration, error) {
 	return requireDuration("MONGO_PING_TIMEOUT")
 }
 
-func loadRedisAddr() (string, error) {
-	return requireString("REDIS_ADDR")
-}
-
-func loadRedisUsername() string {
-	return os.Getenv("REDIS_USERNAME")
-}
-
-func loadRedisPassword() string {
-	return os.Getenv("REDIS_PASSWORD")
-}
-
-func loadRedisDB() (int, error) {
-	return requireNonNegativeInt("REDIS_DB")
+func loadRedisURI() (string, error) {
+	return requireString("REDIS_URI")
 }
 
 func loadRedisPoolSize() (int, error) {

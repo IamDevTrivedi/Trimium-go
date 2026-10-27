@@ -24,14 +24,15 @@ type Redis struct {
 	client *redis.Client
 }
 
-// NewRedis creates a Redis client, verifies the connection with a ping and
-// returns it.
-func NewRedis(ctx context.Context, addr, username, password string, db int, opts RedisOptions) (*Redis, error) {
-	if addr == "" {
-		return nil, errors.New("redis: addr is required")
+// NewRedis creates a Redis client from a connection URI, verifies the
+// connection with a ping and returns it.
+func NewRedis(ctx context.Context, uri string, opts RedisOptions) (*Redis, error) {
+	if uri == "" {
+		return nil, errors.New("redis: uri is required")
 	}
-	if db < 0 {
-		return nil, fmt.Errorf("redis: db %d cannot be negative", db)
+	redisOpts, err := redis.ParseURL(uri)
+	if err != nil {
+		return nil, fmt.Errorf("redis: invalid uri: %w", err)
 	}
 	if opts.PoolSize <= 0 {
 		return nil, fmt.Errorf("redis: pool size %d must be greater than zero", opts.PoolSize)
@@ -59,17 +60,13 @@ func NewRedis(ctx context.Context, addr, username, password string, db int, opts
 		return nil, fmt.Errorf("redis: ping timeout %v must be greater than zero", opts.PingTimeout)
 	}
 
-	client := redis.NewClient(&redis.Options{
-		Addr:         addr,
-		Username:     username,
-		Password:     password,
-		DB:           db,
-		PoolSize:     opts.PoolSize,
-		MinIdleConns: opts.MinIdleConns,
-		DialTimeout:  opts.DialTimeout,
-		ReadTimeout:  opts.ReadTimeout,
-		WriteTimeout: opts.WriteTimeout,
-	})
+	redisOpts.PoolSize = opts.PoolSize
+	redisOpts.MinIdleConns = opts.MinIdleConns
+	redisOpts.DialTimeout = opts.DialTimeout
+	redisOpts.ReadTimeout = opts.ReadTimeout
+	redisOpts.WriteTimeout = opts.WriteTimeout
+
+	client := redis.NewClient(redisOpts)
 
 	r := &Redis{client: client}
 

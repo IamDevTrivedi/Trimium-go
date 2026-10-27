@@ -33,7 +33,7 @@ func newTestRateLimiter(t *testing.T) *RateLimiter {
 	t.Helper()
 	mr := miniredis.RunT(t)
 
-	store, err := database.NewRedis(context.Background(), mr.Addr(), "", "", 0, database.RedisOptions{
+	store, err := database.NewRedis(context.Background(), "redis://"+mr.Addr(), database.RedisOptions{
 		PoolSize:     5,
 		MinIdleConns: 1,
 		DialTimeout:  time.Second,
