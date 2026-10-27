@@ -30,10 +30,12 @@ GO                    := go
 
 # Phony targets
 .PHONY: help setup clean \
-        build run run-build dev \
+        build build-check run run-build dev \
         test vet govulncheck \
         fmt fmt-check \
         lint lint-check \
+        tidy tidy-check \
+        ci check \
         up down \
         install-lint install-air install-govulncheck \
 		geoip-update geoip-check
@@ -59,6 +61,9 @@ install-govulncheck: ## Install govulncheck (version set by GOVULNCHECK_VERSION)
 build: ## Compile the binary into ./bin
 	@mkdir -p $(BIN_DIR)
 	$(GO) build -o $(BIN) $(CMD_PATH)
+
+build-check: ## Verify that all packages and commands compile
+	$(GO) build ./...
 
 run: ## Run the app in development mode
 	APP_ENV=$(DEV_ENV) $(GO) run $(CMD_PATH)
@@ -100,6 +105,38 @@ lint: ## Run golangci-lint with automatic fixes
 
 lint-check: ## Run golangci-lint without applying fixes
 	$(GOLANGCI_LINT) run
+	$(GOLANGCI_LINT) fmt --diff
+
+# Modules
+tidy: ## Download and clean up go.mod and go.sum
+	$(GO) mod tidy
+
+tidy-check: ## Verify module files and fail if go.mod/go.sum need tidying
+	$(GO) mod download
+	$(GO) mod verify
+	$(GO) mod tidy -diff
+
+# All CI checks
+ci: ## Run all CI checks silently and report final result (mod, fmt, lint, vet, vuln, race test, build)
+	@tmp=$$(mktemp); \
+	trap 'rm -f "$$tmp"' EXIT; \
+	run_step() { \
+		if ! "$$@" > "$$tmp" 2>&1; then \
+			echo "[FAILED] $$*"; \
+			cat "$$tmp"; \
+			exit 1; \
+		fi; \
+	}; \
+	run_step make tidy-check; \
+	run_step make fmt-check; \
+	run_step make lint-check; \
+	run_step make vet; \
+	run_step make govulncheck; \
+	run_step make test; \
+	run_step make build-check; \
+	echo "All CI checks passed successfully!"
+
+check: ci ## Alias for make ci
 
 # Docker
 up: ## Start docker-compose development stack (detached)
