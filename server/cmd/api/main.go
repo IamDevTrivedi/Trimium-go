@@ -112,7 +112,7 @@ func run() error {
 				Limit:  10,
 				Window: time.Minute,
 				KeyGen: func(c *gin.Context) string {
-					return c.ClientIP()
+					return middleware.GetRequestIP(c)
 				},
 			},
 		),
