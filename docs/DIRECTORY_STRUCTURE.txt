@@ -60,15 +60,27 @@
 │       │   ├── health
 │       │   │   ├── handler.go
 │       │   │   ├── handler_test.go
+│       │   │   ├── module.go
+│       │   │   ├── module_test.go
 │       │   │   ├── ratelimiter.go
+│       │   │   ├── ratelimiter_test.go
+│       │   │   ├── repository.go
+│       │   │   ├── repository_test.go
 │       │   │   ├── route.go
+│       │   │   ├── route_test.go
 │       │   │   ├── service.go
 │       │   │   └── service_test.go
 │       │   └── root
 │       │       ├── handler.go
 │       │       ├── handler_test.go
+│       │       ├── module.go
+│       │       ├── module_test.go
 │       │       ├── ratelimiter.go
+│       │       ├── ratelimiter_test.go
+│       │       ├── repository.go
+│       │       ├── repository_test.go
 │       │       ├── route.go
+│       │       ├── route_test.go
 │       │       ├── service.go
 │       │       └── service_test.go
 │       └── response
@@ -76,4 +88,4 @@
 │           └── response_test.go
 └── skills-lock.json
 
-21 directories, 56 files
+21 directories, 68 files
