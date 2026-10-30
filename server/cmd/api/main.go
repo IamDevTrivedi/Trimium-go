@@ -18,7 +18,6 @@ import (
 	"server/internal/mailer"
 	"server/internal/middleware"
 	"server/internal/modules/health"
-	"server/internal/modules/root"
 )
 
 func main() {
@@ -116,15 +115,7 @@ func run() error {
 		),
 	)
 
-	rootRateLimiter := root.NewRateLimiter(redisStore)
-	rootService := root.NewService()
-	rootHandler := root.NewHandler(rootService)
-	root.RegisterRoutes(router, rootRateLimiter, rootHandler)
-
-	healthRateLimiter := health.NewRateLimiter(redisStore)
-	healthService := health.NewService()
-	healthHandler := health.NewHandler(healthService)
-	health.RegisterRoutes(router, healthRateLimiter, healthHandler)
+	health.Register(router, redisStore, mongoStore)
 
 	srv := &http.Server{
 		Addr:              fmt.Sprintf(":%d", cfg.Port),
