@@ -18,6 +18,7 @@ import (
 	"server/internal/mailer"
 	"server/internal/middleware"
 	"server/internal/modules/health"
+	"server/internal/modules/root"
 )
 
 func main() {
@@ -115,6 +116,7 @@ func run() error {
 		),
 	)
 
+	root.Register(router, redisStore, mongoStore)
 	health.Register(router, redisStore, mongoStore)
 
 	srv := &http.Server{

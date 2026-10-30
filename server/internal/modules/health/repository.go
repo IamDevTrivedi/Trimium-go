@@ -1,10 +1,12 @@
 package health
 
-import (
-	"context"
+import "context"
 
-	"server/internal/database"
-)
+// Pinger is the health-check operation required from a datastore client.
+// Both database.Redis and database.Mongo satisfy it.
+type Pinger interface {
+	Ping(ctx context.Context) error
+}
 
 type Repository interface {
 	PingRedis(ctx context.Context) error
@@ -12,18 +14,18 @@ type Repository interface {
 }
 
 type repository struct {
-	redis *database.Redis
-	mongo *database.Mongo
+	redis Pinger
+	mongo Pinger
 }
 
-func NewRepository(redis *database.Redis, mongo *database.Mongo) Repository {
+func NewRepository(redis, mongo Pinger) Repository {
 	return &repository{redis: redis, mongo: mongo}
 }
 
 func (r *repository) PingRedis(ctx context.Context) error {
-	return r.redis.Client().Ping(ctx).Err()
+	return r.redis.Ping(ctx)
 }
 
 func (r *repository) PingMongo(ctx context.Context) error {
-	return r.mongo.Client().Ping(ctx, nil)
+	return r.mongo.Ping(ctx)
 }
