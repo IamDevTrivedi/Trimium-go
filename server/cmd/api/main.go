@@ -29,7 +29,6 @@ func main() {
 }
 
 func run() error {
-
 	// getting the logger instance
 	logger := logger.Get()
 	logger.Info("Initialize the process")
