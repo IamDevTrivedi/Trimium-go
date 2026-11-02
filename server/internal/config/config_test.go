@@ -1,957 +1,479 @@
 package config
 
 import (
+	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 )
 
-func resetState() {
+func resetConfigState() {
 	cached = nil
-	err = nil
+	loadErr = nil
 	once = sync.Once{}
 }
 
-func TestLoadAppEnv(t *testing.T) {
+func validEnvValues(geoIPPath string) map[string]string {
+	return map[string]string{
+		"APP_ENV":               "development",
+		"PORT":                  "8080",
+		"BACKEND_URL_DEV":       "http://localhost:8080",
+		"FRONTEND_URL_DEV":      "http://localhost:3000",
+		"BACKEND_URL_PROD":      "https://api.example.com",
+		"FRONTEND_URL_PROD":     "https://example.com",
+		"SMTP_HOST":             "127.0.0.1",
+		"SMTP_PORT":             "587",
+		"SMTP_USERNAME":         "smtp-user",
+		"SMTP_PASSWORD":         "smtp-password",
+		"FROM_EMAIL":            "noreply@example.com",
+		"GEOIP_DB_PATH":         geoIPPath,
+		"MONGO_URI":             "mongodb://localhost:27017",
+		"MONGO_DATABASE":        "trimium",
+		"MONGO_MAX_POOL_SIZE":   "10",
+		"MONGO_MIN_POOL_SIZE":   "2",
+		"MONGO_CONNECT_TIMEOUT": "5s",
+		"MONGO_PING_TIMEOUT":    "3s",
+		"REDIS_URI":             "redis://localhost:6379",
+		"REDIS_POOL_SIZE":       "10",
+		"REDIS_MIN_IDLE_CONNS":  "2",
+		"REDIS_DIAL_TIMEOUT":    "5s",
+		"REDIS_READ_TIMEOUT":    "3s",
+		"REDIS_WRITE_TIMEOUT":   "3s",
+		"REDIS_PING_TIMEOUT":    "2s",
+	}
+}
+
+func setValidEnv(t *testing.T) string {
+	t.Helper()
+
+	geoIPPath := filepath.Join(t.TempDir(), "GeoLite2-City.mmdb")
+	if err := os.WriteFile(geoIPPath, []byte("test-geoip-db"), 0o600); err != nil {
+		t.Fatalf("write geoip db: %v", err)
+	}
+
+	for key, value := range validEnvValues(geoIPPath) {
+		t.Setenv(key, value)
+	}
+
+	return geoIPPath
+}
+
+func chdirToTemp(t *testing.T) string {
+	t.Helper()
+
+	dir := t.TempDir()
+	t.Chdir(dir)
+	return dir
+}
+
+func writeFile(t *testing.T, path, content string) {
+	t.Helper()
+
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("write %s: %v", path, err)
+	}
+}
+
+func unsetEnv(t *testing.T, key string) {
+	t.Helper()
+
+	oldValue, existed := os.LookupEnv(key)
+	if err := os.Unsetenv(key); err != nil {
+		t.Fatalf("unset %s: %v", key, err)
+	}
+
+	t.Cleanup(func() {
+		if existed {
+			_ = os.Setenv(key, oldValue)
+			return
+		}
+		_ = os.Unsetenv(key)
+	})
+}
+
+func TestLoad_DevelopmentSuccess(t *testing.T) {
+	resetConfigState()
+	geoIPPath := setValidEnv(t)
+	dir := chdirToTemp(t)
+	writeFile(t, filepath.Join(dir, ".env.development"), "")
+
+	cfg, err := load()
+	if err != nil {
+		t.Fatalf("load() error = %v", err)
+	}
+
+	if cfg.AppEnv != "development" {
+		t.Errorf("AppEnv = %q, want %q", cfg.AppEnv, "development")
+	}
+	if cfg.Port != 8080 {
+		t.Errorf("Port = %d, want %d", cfg.Port, 8080)
+	}
+	if cfg.GeoIPDBPath != geoIPPath {
+		t.Errorf("GeoIPDBPath = %q, want %q", cfg.GeoIPDBPath, geoIPPath)
+	}
+	if cfg.MongoConnectTimeout != 5*time.Second {
+		t.Errorf("MongoConnectTimeout = %v, want %v", cfg.MongoConnectTimeout, 5*time.Second)
+	}
+	if cfg.MongoPingTimeout != 3*time.Second {
+		t.Errorf("MongoPingTimeout = %v, want %v", cfg.MongoPingTimeout, 3*time.Second)
+	}
+	if cfg.RedisReadTimeout != 3*time.Second {
+		t.Errorf("RedisReadTimeout = %v, want %v", cfg.RedisReadTimeout, 3*time.Second)
+	}
+	if cfg.RedisWriteTimeout != 3*time.Second {
+		t.Errorf("RedisWriteTimeout = %v, want %v", cfg.RedisWriteTimeout, 3*time.Second)
+	}
+	if cfg.RedisPingTimeout != 2*time.Second {
+		t.Errorf("RedisPingTimeout = %v, want %v", cfg.RedisPingTimeout, 2*time.Second)
+	}
+}
+
+func TestLoad_ProductionWithoutEnvFile(t *testing.T) {
+	resetConfigState()
+	setValidEnv(t)
+	t.Setenv("APP_ENV", "production")
+	chdirToTemp(t)
+
+	cfg, err := load()
+	if err != nil {
+		t.Fatalf("load() error = %v", err)
+	}
+	if cfg.AppEnv != "production" {
+		t.Errorf("AppEnv = %q, want %q", cfg.AppEnv, "production")
+	}
+}
+
+func TestLoad_ReadsValuesFromDevelopmentEnvFile(t *testing.T) {
+	resetConfigState()
+
+	geoIPPath := filepath.Join(t.TempDir(), "GeoLite2-City.mmdb")
+	writeFile(t, geoIPPath, "test-geoip-db")
+
+	values := validEnvValues(geoIPPath)
+	values["APP_ENV"] = "development"
+
+	dir := chdirToTemp(t)
+	var envFile strings.Builder
+	for key, value := range values {
+		fmt.Fprintf(&envFile, "%s=%s\n", key, value)
+	}
+	writeFile(t, filepath.Join(dir, ".env.development"), envFile.String())
+
+	t.Setenv("APP_ENV", "development")
+	for key := range values {
+		if key == "APP_ENV" {
+			continue
+		}
+		unsetEnv(t, key)
+	}
+
+	cfg, err := load()
+	if err != nil {
+		t.Fatalf("load() error = %v", err)
+	}
+
+	if cfg.Port != 8080 {
+		t.Errorf("Port = %d, want %d", cfg.Port, 8080)
+	}
+	if cfg.MongoDatabase != "trimium" {
+		t.Errorf("MongoDatabase = %q, want %q", cfg.MongoDatabase, "trimium")
+	}
+	if cfg.GeoIPDBPath != geoIPPath {
+		t.Errorf("GeoIPDBPath = %q, want %q", cfg.GeoIPDBPath, geoIPPath)
+	}
+}
+
+func TestLoad_InvalidAppEnv(t *testing.T) {
 	tests := []struct {
-		name      string
-		envVal    string
-		wantEnv   string
-		expectErr bool
+		name   string
+		appEnv string
 	}{
-		{"valid development", "development", "development", false},
-		{"valid production", "production", "production", false},
-		{"valid test", "test", "test", false},
-		{"invalid environment", "staging", "", true},
-		{"empty environment", "", "", true},
+		{name: "empty", appEnv: ""},
+		{name: "unknown", appEnv: "staging"},
+		{name: "wrong case", appEnv: "Production"},
+		{name: "short form", appEnv: "prod"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv("APP_ENV", tt.envVal)
+			resetConfigState()
+			setValidEnv(t)
+			t.Setenv("APP_ENV", tt.appEnv)
+			chdirToTemp(t)
 
-			got, err := loadAppEnv()
-			if tt.expectErr && err == nil {
-				t.Fatalf("expected error, got nil")
+			cfg, err := load()
+			if cfg != nil {
+				t.Fatalf("load() cfg = %#v, want nil", cfg)
 			}
-			if !tt.expectErr && err != nil {
-				t.Fatalf("unexpected error: %v", err)
+			if err == nil {
+				t.Fatal("load() error = nil, want error")
 			}
-			if got != tt.wantEnv {
-				t.Errorf("got %q, want %q", got, tt.wantEnv)
+			if !strings.Contains(err.Error(), "APP_ENV must be exactly 'production' or 'development'") {
+				t.Errorf("load() error = %q, want APP_ENV validation error", err)
 			}
 		})
 	}
 }
 
-func TestLoadPort(t *testing.T) {
-	tests := []struct {
-		name      string
-		portVal   string
-		wantPort  int
-		expectErr bool
-	}{
-		{"valid port 8080", "8080", 8080, false},
-		{"valid port 1", "1", 1, false},
-		{"valid port 65535", "65535", 65535, false},
-		{"invalid port non-numeric", "abc", 0, true},
-		{"invalid port out of range low", "0", 0, true},
-		{"invalid port out of range negative", "-10", 0, true},
-		{"invalid port out of range high", "65536", 0, true},
-		{"empty port", "", 0, true},
-	}
+func TestLoad_EnvFileErrors(t *testing.T) {
+	t.Run("development file missing", func(t *testing.T) {
+		resetConfigState()
+		setValidEnv(t)
+		t.Setenv("APP_ENV", "development")
+		chdirToTemp(t)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv("PORT", tt.portVal)
+		cfg, err := load()
+		if cfg != nil {
+			t.Fatalf("load() cfg = %#v, want nil", cfg)
+		}
+		if err == nil {
+			t.Fatal("load() error = nil, want error")
+		}
+		if !strings.Contains(err.Error(), "failed to load environment file .env.development") {
+			t.Errorf("load() error = %q, want env file error", err)
+		}
+	})
 
-			got, err := loadPort()
-			if tt.expectErr && err == nil {
-				t.Fatalf("expected error, got nil")
-			}
-			if !tt.expectErr && err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if got != tt.wantPort {
-				t.Errorf("got %d, want %d", got, tt.wantPort)
-			}
-		})
-	}
+	t.Run("production file malformed", func(t *testing.T) {
+		resetConfigState()
+		setValidEnv(t)
+		t.Setenv("APP_ENV", "production")
+		dir := chdirToTemp(t)
+		writeFile(t, filepath.Join(dir, ".env.production"), "BAD$KEY=value\n")
+
+		cfg, err := load()
+		if cfg != nil {
+			t.Fatalf("load() cfg = %#v, want nil", cfg)
+		}
+		if err == nil {
+			t.Fatal("load() error = nil, want error")
+		}
+		if !strings.Contains(err.Error(), "failed to load environment file .env.production") {
+			t.Errorf("load() error = %q, want env file error", err)
+		}
+	})
 }
 
-func TestLoadSMTPHost(t *testing.T) {
-	tests := []struct {
-		name      string
-		hostVal   string
-		wantHost  string
-		expectErr bool
-	}{
-		{"valid localhost", "localhost", "localhost", false},
-		{"valid domain", "smtp.example.com", "smtp.example.com", false},
-		{"empty host", "", "", true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv("SMTP_HOST", tt.hostVal)
-
-			got, err := loadSMTPHost()
-			if tt.expectErr && err == nil {
-				t.Fatalf("expected error, got nil")
-			}
-			if !tt.expectErr && err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if got != tt.wantHost {
-				t.Errorf("got %q, want %q", got, tt.wantHost)
-			}
-		})
-	}
-}
-
-func TestLoadSMTPPort(t *testing.T) {
-	tests := []struct {
-		name      string
-		portVal   string
-		wantPort  int
-		expectErr bool
-	}{
-		{"valid port 1025", "1025", 1025, false},
-		{"valid port 587", "587", 587, false},
-		{"valid port 1", "1", 1, false},
-		{"valid port 65535", "65535", 65535, false},
-		{"invalid port non-numeric", "abc", 0, true},
-		{"invalid port out of range low", "0", 0, true},
-		{"invalid port out of range negative", "-10", 0, true},
-		{"invalid port out of range high", "65536", 0, true},
-		{"empty port", "", 0, true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv("SMTP_PORT", tt.portVal)
-
-			got, err := loadSMTPPort()
-			if tt.expectErr && err == nil {
-				t.Fatalf("expected error, got nil")
-			}
-			if !tt.expectErr && err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if got != tt.wantPort {
-				t.Errorf("got %d, want %d", got, tt.wantPort)
-			}
-		})
-	}
-}
-
-func TestLoadSMTPUsername(t *testing.T) {
+func TestLoad_ParseErrors(t *testing.T) {
 	tests := []struct {
 		name  string
+		key   string
 		value string
-		want  string
 	}{
-		{"value set", "smtp-user", "smtp-user"},
-		{"empty allowed", "", ""},
+		{name: "invalid int", key: "PORT", value: "not-a-number"},
+		{name: "invalid uint", key: "MONGO_MAX_POOL_SIZE", value: "-1"},
+		{name: "invalid duration", key: "MONGO_CONNECT_TIMEOUT", value: "soon"},
+		{name: "empty required variable", key: "MONGO_DATABASE", value: ""},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv("SMTP_USERNAME", tt.value)
+			resetConfigState()
+			setValidEnv(t)
+			t.Setenv("APP_ENV", "production")
+			chdirToTemp(t)
+			t.Setenv(tt.key, tt.value)
 
-			if got := loadSMTPUsername(); got != tt.want {
-				t.Errorf("got %q, want %q", got, tt.want)
+			cfg, err := load()
+			if cfg != nil {
+				t.Fatalf("load() cfg = %#v, want nil", cfg)
+			}
+			if err == nil {
+				t.Fatal("load() error = nil, want error")
+			}
+			if !strings.Contains(err.Error(), "config parse") {
+				t.Errorf("load() error = %q, want parse error", err)
 			}
 		})
 	}
 }
 
-func TestLoadSMTPPassword(t *testing.T) {
+func TestLoad_ValidationErrors(t *testing.T) {
 	tests := []struct {
-		name  string
-		value string
-		want  string
+		name    string
+		key     string
+		value   string
+		wantSub []string
 	}{
-		{"value set", "smtp-pass", "smtp-pass"},
-		{"empty allowed", "", ""},
+		{name: "port too low", key: "PORT", value: "0", wantSub: []string{"Port", "min"}},
+		{name: "port too high", key: "PORT", value: "65536", wantSub: []string{"Port", "max"}},
+		{name: "invalid dev backend url", key: "BACKEND_URL_DEV", value: "not-a-url", wantSub: []string{"BackendURLDev", "http_url"}},
+		{name: "invalid dev frontend url", key: "FRONTEND_URL_DEV", value: "ftp://example.com", wantSub: []string{"FrontendURLDev", "http_url"}},
+		{name: "invalid prod backend url", key: "BACKEND_URL_PROD", value: "example.com", wantSub: []string{"BackendURLProd", "http_url"}},
+		{name: "invalid smtp host", key: "SMTP_HOST", value: "not a host!", wantSub: []string{"SMTPHost"}},
+		{name: "smtp port too low", key: "SMTP_PORT", value: "0", wantSub: []string{"SMTPPort", "min"}},
+		{name: "invalid from email", key: "FROM_EMAIL", value: "not-an-email", wantSub: []string{"FromEmail", "email"}},
+		{name: "geoip file missing", key: "GEOIP_DB_PATH", value: "/definitely/not/a/real/geoip.mmdb", wantSub: []string{"GeoIPDBPath", "file"}},
+		{name: "invalid mongo uri", key: "MONGO_URI", value: "not a uri", wantSub: []string{"MongoURI", "uri"}},
+		{name: "mongo max pool zero", key: "MONGO_MAX_POOL_SIZE", value: "0", wantSub: []string{"MongoMaxPoolSize", "min"}},
+		{name: "mongo min pool above max", key: "MONGO_MIN_POOL_SIZE", value: "11", wantSub: []string{"MongoMinPoolSize", "ltefield"}},
+		{name: "mongo connect timeout zero", key: "MONGO_CONNECT_TIMEOUT", value: "0s", wantSub: []string{"MongoConnectTimeout", "gt"}},
+		{name: "mongo ping timeout negative", key: "MONGO_PING_TIMEOUT", value: "-1s", wantSub: []string{"MongoPingTimeout", "gt"}},
+		{name: "invalid redis uri", key: "REDIS_URI", value: "not a uri", wantSub: []string{"RedisURI", "uri"}},
+		{name: "redis pool zero", key: "REDIS_POOL_SIZE", value: "0", wantSub: []string{"RedisPoolSize", "min"}},
+		{name: "redis min idle above pool", key: "REDIS_MIN_IDLE_CONNS", value: "11", wantSub: []string{"RedisMinIdleConns", "ltefield"}},
+		{name: "redis dial timeout zero", key: "REDIS_DIAL_TIMEOUT", value: "0s", wantSub: []string{"RedisDialTimeout", "gt"}},
+		{name: "redis read timeout zero", key: "REDIS_READ_TIMEOUT", value: "0s", wantSub: []string{"RedisReadTimeout", "gt"}},
+		{name: "redis write timeout zero", key: "REDIS_WRITE_TIMEOUT", value: "0s", wantSub: []string{"RedisWriteTimeout", "gt"}},
+		{name: "redis ping timeout zero", key: "REDIS_PING_TIMEOUT", value: "0s", wantSub: []string{"RedisPingTimeout", "gt"}},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv("SMTP_PASSWORD", tt.value)
+			resetConfigState()
+			setValidEnv(t)
+			t.Setenv("APP_ENV", "production")
+			chdirToTemp(t)
+			t.Setenv(tt.key, tt.value)
 
-			if got := loadSMTPPassword(); got != tt.want {
-				t.Errorf("got %q, want %q", got, tt.want)
+			cfg, err := load()
+			if cfg != nil {
+				t.Fatalf("load() cfg = %#v, want nil", cfg)
 			}
-		})
-	}
-}
-
-func TestLoadFromEmail(t *testing.T) {
-	tests := []struct {
-		name      string
-		emailVal  string
-		wantEmail string
-		expectErr bool
-	}{
-		{"valid email", "user@example.com", "user@example.com", false},
-		{"valid formatted email", "Sender Name <user@example.com>", "user@example.com", false},
-		{"invalid syntax plain text", "GEMINI is ASSHOLE", "", true},
-		{"invalid missing at sign", "userexample.com", "", true},
-		{"empty email", "", "", true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv("FROM_EMAIL", tt.emailVal)
-
-			got, err := loadFromEmail()
-			if tt.expectErr && err == nil {
-				t.Fatalf("expected error, got nil")
+			if err == nil {
+				t.Fatal("load() error = nil, want error")
 			}
-			if !tt.expectErr && err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if got != tt.wantEmail {
-				t.Errorf("got %q, want %q", got, tt.wantEmail)
-			}
-		})
-	}
-}
-
-func TestLoadBackendURL(t *testing.T) {
-	tests := []struct {
-		name      string
-		appEnv    string
-		devURL    string
-		prodURL   string
-		want      string
-		expectErr bool
-	}{
-		{"development uses dev URL", "development", "http://localhost:5000", "https://api.example.com", "http://localhost:5000", false},
-		{"production uses prod URL", "production", "http://localhost:5000", "https://api.example.com", "https://api.example.com", false},
-		{"test uses prod URL", "test", "http://localhost:5000", "https://api.example.com", "https://api.example.com", false},
-		{"development missing dev URL", "development", "", "https://api.example.com", "", true},
-		{"production missing prod URL", "production", "http://localhost:5000", "", "", true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv("BACKEND_URL_DEV", tt.devURL)
-			t.Setenv("BACKEND_URL_PROD", tt.prodURL)
-
-			got, err := loadBackendURL(tt.appEnv)
-			if tt.expectErr && err == nil {
-				t.Fatalf("expected error, got nil")
-			}
-			if !tt.expectErr && err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if got != tt.want {
-				t.Errorf("got %q, want %q", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestLoadFrontendURL(t *testing.T) {
-	tests := []struct {
-		name      string
-		appEnv    string
-		devURL    string
-		prodURL   string
-		want      string
-		expectErr bool
-	}{
-		{"development uses dev URL", "development", "http://localhost:3000", "https://trimium.example.com", "http://localhost:3000", false},
-		{"production uses prod URL", "production", "http://localhost:3000", "https://trimium.example.com", "https://trimium.example.com", false},
-		{"test uses prod URL", "test", "http://localhost:3000", "https://trimium.example.com", "https://trimium.example.com", false},
-		{"development missing dev URL", "development", "", "https://trimium.example.com", "", true},
-		{"production missing prod URL", "production", "http://localhost:3000", "", "", true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv("FRONTEND_URL_DEV", tt.devURL)
-			t.Setenv("FRONTEND_URL_PROD", tt.prodURL)
-
-			got, err := loadFrontendURL(tt.appEnv)
-			if tt.expectErr && err == nil {
-				t.Fatalf("expected error, got nil")
-			}
-			if !tt.expectErr && err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if got != tt.want {
-				t.Errorf("got %q, want %q", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestLoadGeoIPDBPath(t *testing.T) {
-	tests := []struct {
-		name      string
-		value     string
-		want      string
-		expectErr bool
-	}{
-		{"valid path", "./data/geoip/GeoLite2-City.mmdb", "./data/geoip/GeoLite2-City.mmdb", false},
-		{"empty path", "", "", true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv("GEOIP_DB_PATH", tt.value)
-
-			got, err := loadGeoIPDBPath()
-			if tt.expectErr && err == nil {
-				t.Fatalf("expected error, got nil")
-			}
-			if !tt.expectErr && err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if got != tt.want {
-				t.Errorf("got %q, want %q", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestLoadMongoURI(t *testing.T) {
-	tests := []struct {
-		name      string
-		value     string
-		want      string
-		expectErr bool
-	}{
-		{"valid uri", "mongodb://localhost:27017", "mongodb://localhost:27017", false},
-		{"valid uri with auth", "mongodb://root:root@localhost:5002/?authSource=admin", "mongodb://root:root@localhost:5002/?authSource=admin", false},
-		{"empty uri", "", "", true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv("MONGO_URI", tt.value)
-
-			got, err := loadMongoURI()
-			if tt.expectErr && err == nil {
-				t.Fatalf("expected error, got nil")
-			}
-			if !tt.expectErr && err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if got != tt.want {
-				t.Errorf("got %q, want %q", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestLoadMongoDatabase(t *testing.T) {
-	tests := []struct {
-		name      string
-		value     string
-		want      string
-		expectErr bool
-	}{
-		{"valid database", "trimium", "trimium", false},
-		{"empty database", "", "", true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv("MONGO_DB_NAME", tt.value)
-
-			got, err := loadMongoDatabase()
-			if tt.expectErr && err == nil {
-				t.Fatalf("expected error, got nil")
-			}
-			if !tt.expectErr && err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if got != tt.want {
-				t.Errorf("got %q, want %q", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestLoadMongoMaxPoolSize(t *testing.T) {
-	tests := []struct {
-		name      string
-		value     string
-		want      uint64
-		expectErr bool
-	}{
-		{"missing", "", 0, true},
-		{"valid size", "50", 50, false},
-		{"zero means unlimited", "0", 0, false},
-		{"invalid non-numeric", "abc", 0, true},
-		{"invalid negative", "-1", 0, true},
-		{"invalid fractional", "1.5", 0, true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv("MONGO_MAX_POOL_SIZE", tt.value)
-
-			got, err := loadMongoMaxPoolSize()
-			if tt.expectErr && err == nil {
-				t.Fatalf("expected error, got nil")
-			}
-			if !tt.expectErr && err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if got != tt.want {
-				t.Errorf("got %d, want %d", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestLoadMongoMinPoolSize(t *testing.T) {
-	tests := []struct {
-		name      string
-		value     string
-		want      uint64
-		expectErr bool
-	}{
-		{"missing", "", 0, true},
-		{"valid size", "10", 10, false},
-		{"invalid non-numeric", "abc", 0, true},
-		{"invalid negative", "-1", 0, true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv("MONGO_MIN_POOL_SIZE", tt.value)
-
-			got, err := loadMongoMinPoolSize()
-			if tt.expectErr && err == nil {
-				t.Fatalf("expected error, got nil")
-			}
-			if !tt.expectErr && err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if got != tt.want {
-				t.Errorf("got %d, want %d", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestLoadMongoConnectTimeout(t *testing.T) {
-	tests := []struct {
-		name      string
-		value     string
-		want      time.Duration
-		expectErr bool
-	}{
-		{"missing", "", 0, true},
-		{"valid seconds", "5s", 5 * time.Second, false},
-		{"valid milliseconds", "1500ms", 1500 * time.Millisecond, false},
-		{"invalid non-duration", "abc", 0, true},
-		{"invalid zero", "0s", 0, true},
-		{"invalid negative", "-1s", 0, true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv("MONGO_CONNECT_TIMEOUT", tt.value)
-
-			got, err := loadMongoConnectTimeout()
-			if tt.expectErr && err == nil {
-				t.Fatalf("expected error, got nil")
-			}
-			if !tt.expectErr && err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if got != tt.want {
-				t.Errorf("got %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestLoadMongoPingTimeout(t *testing.T) {
-	tests := []struct {
-		name      string
-		value     string
-		want      time.Duration
-		expectErr bool
-	}{
-		{"missing", "", 0, true},
-		{"valid seconds", "3s", 3 * time.Second, false},
-		{"invalid non-duration", "abc", 0, true},
-		{"invalid zero", "0s", 0, true},
-		{"invalid negative", "-1s", 0, true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv("MONGO_PING_TIMEOUT", tt.value)
-
-			got, err := loadMongoPingTimeout()
-			if tt.expectErr && err == nil {
-				t.Fatalf("expected error, got nil")
-			}
-			if !tt.expectErr && err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if got != tt.want {
-				t.Errorf("got %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestLoadRedisURI(t *testing.T) {
-	tests := []struct {
-		name      string
-		value     string
-		want      string
-		expectErr bool
-	}{
-		{"valid redis uri", "redis://localhost:5001", "redis://localhost:5001", false},
-		{"valid redis uri with auth and db", "redis://user:pass@redis:6379/1", "redis://user:pass@redis:6379/1", false},
-		{"empty redis uri", "", "", true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv("REDIS_URI", tt.value)
-
-			got, err := loadRedisURI()
-			if tt.expectErr && err == nil {
-				t.Fatalf("expected error, got nil")
-			}
-			if !tt.expectErr && err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if got != tt.want {
-				t.Errorf("got %q, want %q", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestLoadRedisPoolSize(t *testing.T) {
-	tests := []struct {
-		name      string
-		value     string
-		want      int
-		expectErr bool
-	}{
-		{"valid size", "10", 10, false},
-		{"missing", "", 0, true},
-		{"invalid zero", "0", 0, true},
-		{"invalid negative", "-1", 0, true},
-		{"invalid non-numeric", "abc", 0, true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv("REDIS_POOL_SIZE", tt.value)
-
-			got, err := loadRedisPoolSize()
-			if tt.expectErr && err == nil {
-				t.Fatalf("expected error, got nil")
-			}
-			if !tt.expectErr && err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if got != tt.want {
-				t.Errorf("got %d, want %d", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestLoadRedisMinIdleConns(t *testing.T) {
-	tests := []struct {
-		name      string
-		value     string
-		want      int
-		expectErr bool
-	}{
-		{"zero allowed", "0", 0, false},
-		{"valid count", "5", 5, false},
-		{"missing", "", 0, true},
-		{"invalid negative", "-1", 0, true},
-		{"invalid non-numeric", "abc", 0, true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv("REDIS_MIN_IDLE_CONNS", tt.value)
-
-			got, err := loadRedisMinIdleConns()
-			if tt.expectErr && err == nil {
-				t.Fatalf("expected error, got nil")
-			}
-			if !tt.expectErr && err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if got != tt.want {
-				t.Errorf("got %d, want %d", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestLoadRedisTimeouts(t *testing.T) {
-	loaders := []struct {
-		name string
-		key  string
-		load func() (time.Duration, error)
-	}{
-		{"dial timeout", "REDIS_DIAL_TIMEOUT", loadRedisDialTimeout},
-		{"read timeout", "REDIS_READ_TIMEOUT", loadRedisReadTimeout},
-		{"write timeout", "REDIS_WRITE_TIMEOUT", loadRedisWriteTimeout},
-		{"ping timeout", "REDIS_PING_TIMEOUT", loadRedisPingTimeout},
-	}
-
-	tests := []struct {
-		name      string
-		value     string
-		want      time.Duration
-		expectErr bool
-	}{
-		{"missing", "", 0, true},
-		{"valid", "3s", 3 * time.Second, false},
-		{"valid milliseconds", "1500ms", 1500 * time.Millisecond, false},
-		{"invalid non-duration", "abc", 0, true},
-		{"invalid zero", "0s", 0, true},
-		{"invalid negative", "-1s", 0, true},
-	}
-
-	for _, loader := range loaders {
-		t.Run(loader.name, func(t *testing.T) {
-			for _, tt := range tests {
-				t.Run(tt.name, func(t *testing.T) {
-					t.Setenv(loader.key, tt.value)
-
-					got, err := loader.load()
-					if tt.expectErr && err == nil {
-						t.Fatalf("expected error, got nil")
-					}
-					if !tt.expectErr && err != nil {
-						t.Fatalf("unexpected error: %v", err)
-					}
-					if got != tt.want {
-						t.Errorf("got %v, want %v", got, tt.want)
-					}
-				})
+			for _, want := range tt.wantSub {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("load() error = %q, want it to contain %q", err, want)
+				}
 			}
 		})
 	}
 }
 
 func TestLoadEnvFile(t *testing.T) {
-	t.Run("production allows missing env file", func(t *testing.T) {
-		err := loadEnvFile("production")
-		if err != nil {
-			t.Fatalf("unexpected error in production: %v", err)
+	t.Run("loads development file", func(t *testing.T) {
+		const key = "CONFIG_TEST_DEVELOPMENT_VALUE"
+		unsetEnv(t, key)
+
+		dir := chdirToTemp(t)
+		writeFile(t, filepath.Join(dir, ".env.development"), key+"=from-development\n")
+
+		if err := loadEnvFile("development"); err != nil {
+			t.Fatalf("loadEnvFile() error = %v", err)
+		}
+		if got := os.Getenv(key); got != "from-development" {
+			t.Errorf("%s = %q, want %q", key, got, "from-development")
 		}
 	})
 
-	t.Run("missing env file for nonexistent env returns error", func(t *testing.T) {
-		err := loadEnvFile("nonexistent_env")
+	t.Run("loads production file", func(t *testing.T) {
+		const key = "CONFIG_TEST_PRODUCTION_VALUE"
+		unsetEnv(t, key)
+
+		dir := chdirToTemp(t)
+		writeFile(t, filepath.Join(dir, ".env.production"), key+"=from-production\n")
+
+		if err := loadEnvFile("production"); err != nil {
+			t.Fatalf("loadEnvFile() error = %v", err)
+		}
+		if got := os.Getenv(key); got != "from-production" {
+			t.Errorf("%s = %q, want %q", key, got, "from-production")
+		}
+	})
+
+	t.Run("missing development file", func(t *testing.T) {
+		chdirToTemp(t)
+
+		err := loadEnvFile("development")
 		if err == nil {
-			t.Fatalf("expected error for nonexistent file, got nil")
+			t.Fatal("loadEnvFile() error = nil, want error")
+		}
+		if !strings.Contains(err.Error(), "failed to load environment file .env.development") {
+			t.Errorf("loadEnvFile() error = %q, want env file error", err)
+		}
+	})
+
+	t.Run("missing production file is allowed", func(t *testing.T) {
+		chdirToTemp(t)
+
+		if err := loadEnvFile("production"); err != nil {
+			t.Errorf("loadEnvFile() error = %v, want nil", err)
+		}
+	})
+
+	t.Run("does not override existing environment", func(t *testing.T) {
+		const key = "CONFIG_TEST_PRECEDENCE_VALUE"
+		t.Setenv(key, "from-environment")
+
+		dir := chdirToTemp(t)
+		writeFile(t, filepath.Join(dir, ".env.development"), key+"=from-file\n")
+
+		if err := loadEnvFile("development"); err != nil {
+			t.Fatalf("loadEnvFile() error = %v", err)
+		}
+		if got := os.Getenv(key); got != "from-environment" {
+			t.Errorf("%s = %q, want %q", key, got, "from-environment")
+		}
+	})
+
+	t.Run("malformed production file", func(t *testing.T) {
+		dir := chdirToTemp(t)
+		writeFile(t, filepath.Join(dir, ".env.production"), "BAD$KEY=value\n")
+
+		err := loadEnvFile("production")
+		if err == nil {
+			t.Fatal("loadEnvFile() error = nil, want error")
+		}
+		if !strings.Contains(err.Error(), "failed to load environment file .env.production") {
+			t.Errorf("loadEnvFile() error = %q, want env file error", err)
 		}
 	})
 }
 
-func TestGet(t *testing.T) {
-	t.Cleanup(resetState)
+func TestGet_CachesConfig(t *testing.T) {
+	resetConfigState()
+	t.Cleanup(resetConfigState)
 
-	t.Run("invalid APP_ENV returns error", func(t *testing.T) {
-		resetState()
-		t.Setenv("APP_ENV", "invalid")
-		t.Setenv("PORT", "8080")
-		t.Setenv("SMTP_HOST", "localhost")
-		t.Setenv("SMTP_PORT", "1025")
+	setValidEnv(t)
+	t.Setenv("APP_ENV", "production")
+	chdirToTemp(t)
 
-		cfg, err := Get()
-		if err == nil {
-			t.Fatalf("expected error, got nil")
-		}
-		if cfg != nil {
-			t.Fatalf("expected nil config, got %v", cfg)
-		}
-	})
+	first, err := Get()
+	if err != nil {
+		t.Fatalf("Get() error = %v", err)
+	}
+	if first == nil {
+		t.Fatal("Get() config = nil, want config")
+	}
 
-	t.Run("missing mongo settings returns error", func(t *testing.T) {
-		resetState()
-		t.Setenv("APP_ENV", "production")
-		t.Setenv("PORT", "3000")
-		t.Setenv("SMTP_HOST", "smtp.example.com")
-		t.Setenv("SMTP_PORT", "587")
-		t.Setenv("FROM_EMAIL", "noreply@example.com")
-		t.Setenv("BACKEND_URL_PROD", "https://api.trimium.example.com")
-		t.Setenv("FRONTEND_URL_PROD", "https://trimium.example.com")
-		t.Setenv("GEOIP_DB_PATH", "./data/geoip/GeoLite2-City.mmdb")
-		t.Setenv("MONGO_URI", "mongodb://localhost:27017")
-		t.Setenv("MONGO_DB_NAME", "trimium")
-		t.Setenv("MONGO_MAX_POOL_SIZE", "")
-		t.Setenv("MONGO_MIN_POOL_SIZE", "")
-		t.Setenv("MONGO_CONNECT_TIMEOUT", "")
-		t.Setenv("MONGO_PING_TIMEOUT", "")
+	second, err := Get()
+	if err != nil {
+		t.Fatalf("second Get() error = %v", err)
+	}
+	if second != first {
+		t.Errorf("Get() returned different pointers: %p and %p", first, second)
+	}
+}
 
-		cfg, err := Get()
-		if err == nil {
-			t.Fatalf("expected error, got nil")
-		}
-		if cfg != nil {
-			t.Fatalf("expected nil config, got %v", cfg)
-		}
-		if !strings.Contains(err.Error(), "missing MONGO_MAX_POOL_SIZE") {
-			t.Errorf("unexpected error: %v", err)
-		}
-	})
+func TestGet_CachesLoadError(t *testing.T) {
+	resetConfigState()
+	t.Cleanup(resetConfigState)
 
-	t.Run("missing redis settings returns error", func(t *testing.T) {
-		resetState()
-		t.Setenv("APP_ENV", "production")
-		t.Setenv("PORT", "3000")
-		t.Setenv("SMTP_HOST", "smtp.example.com")
-		t.Setenv("SMTP_PORT", "587")
-		t.Setenv("FROM_EMAIL", "noreply@example.com")
-		t.Setenv("BACKEND_URL_PROD", "https://api.trimium.example.com")
-		t.Setenv("FRONTEND_URL_PROD", "https://trimium.example.com")
-		t.Setenv("GEOIP_DB_PATH", "./data/geoip/GeoLite2-City.mmdb")
-		t.Setenv("MONGO_URI", "mongodb://localhost:27017")
-		t.Setenv("MONGO_DB_NAME", "trimium")
-		t.Setenv("MONGO_MAX_POOL_SIZE", "100")
-		t.Setenv("MONGO_MIN_POOL_SIZE", "0")
-		t.Setenv("MONGO_CONNECT_TIMEOUT", "10s")
-		t.Setenv("MONGO_PING_TIMEOUT", "10s")
-		t.Setenv("REDIS_URI", "redis://localhost:5001")
-		t.Setenv("REDIS_POOL_SIZE", "10")
-		t.Setenv("REDIS_MIN_IDLE_CONNS", "0")
-		t.Setenv("REDIS_DIAL_TIMEOUT", "5s")
-		t.Setenv("REDIS_READ_TIMEOUT", "3s")
-		t.Setenv("REDIS_WRITE_TIMEOUT", "3s")
-		t.Setenv("REDIS_PING_TIMEOUT", "")
+	setValidEnv(t)
+	t.Setenv("APP_ENV", "staging")
+	chdirToTemp(t)
 
-		cfg, err := Get()
-		if err == nil {
-			t.Fatalf("expected error, got nil")
-		}
-		if cfg != nil {
-			t.Fatalf("expected nil config, got %v", cfg)
-		}
-		if !strings.Contains(err.Error(), "missing REDIS_PING_TIMEOUT") {
-			t.Errorf("unexpected error: %v", err)
-		}
-	})
+	first, firstErr := Get()
+	if first != nil {
+		t.Fatalf("Get() config = %#v, want nil", first)
+	}
+	if firstErr == nil {
+		t.Fatal("Get() error = nil, want error")
+	}
 
-	t.Run("valid configuration loads and caches instance", func(t *testing.T) {
-		resetState()
-		t.Setenv("APP_ENV", "production")
-		t.Setenv("PORT", "3000")
-		t.Setenv("SMTP_HOST", "smtp.mailtrap.io")
-		t.Setenv("SMTP_PORT", "2525")
-		t.Setenv("SMTP_USERNAME", "testuser")
-		t.Setenv("SMTP_PASSWORD", "testpass")
-		t.Setenv("FROM_EMAIL", "noreply@example.com")
-		t.Setenv("BACKEND_URL_PROD", "https://api.trimium.example.com")
-		t.Setenv("FRONTEND_URL_PROD", "https://trimium.example.com")
-		t.Setenv("GEOIP_DB_PATH", "./data/geoip/GeoLite2-City.mmdb")
-		t.Setenv("MONGO_URI", "mongodb://localhost:27017")
-		t.Setenv("MONGO_DB_NAME", "trimium")
-		t.Setenv("MONGO_MAX_POOL_SIZE", "50")
-		t.Setenv("MONGO_MIN_POOL_SIZE", "5")
-		t.Setenv("MONGO_CONNECT_TIMEOUT", "3s")
-		t.Setenv("MONGO_PING_TIMEOUT", "2s")
-		wantRedisURI := "redis://localhost:5001/2"
-		t.Setenv("REDIS_URI", wantRedisURI)
-		t.Setenv("REDIS_POOL_SIZE", "20")
-		t.Setenv("REDIS_MIN_IDLE_CONNS", "5")
-		t.Setenv("REDIS_DIAL_TIMEOUT", "4s")
-		t.Setenv("REDIS_READ_TIMEOUT", "3s")
-		t.Setenv("REDIS_WRITE_TIMEOUT", "2s")
-		t.Setenv("REDIS_PING_TIMEOUT", "1s")
-
-		cfg1, err := Get()
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if cfg1 == nil {
-			t.Fatal("expected config instance, got nil")
-		}
-		if cfg1.Port != 3000 {
-			t.Errorf("got port %d, want 3000", cfg1.Port)
-		}
-		if cfg1.AppEnv != "production" {
-			t.Errorf("got appEnv %q, want production", cfg1.AppEnv)
-		}
-		if cfg1.SMTPHost != "smtp.mailtrap.io" {
-			t.Errorf("got smtpHost %q, want smtp.mailtrap.io", cfg1.SMTPHost)
-		}
-		if cfg1.SMTPPort != 2525 {
-			t.Errorf("got smtpPort %d, want 2525", cfg1.SMTPPort)
-		}
-		if cfg1.SMTPUsername != "testuser" {
-			t.Errorf("got smtpUsername %q, want testuser", cfg1.SMTPUsername)
-		}
-		if cfg1.SMTPPassword != "testpass" {
-			t.Errorf("got smtpPassword %q, want testpass", cfg1.SMTPPassword)
-		}
-		if cfg1.FromEmail != "noreply@example.com" {
-			t.Errorf("got fromEmail %q, want noreply@example.com", cfg1.FromEmail)
-		}
-		if cfg1.BackendURL != "https://api.trimium.example.com" {
-			t.Errorf("got backendURL %q, want https://api.trimium.example.com", cfg1.BackendURL)
-		}
-		if cfg1.FrontendURL != "https://trimium.example.com" {
-			t.Errorf("got frontendURL %q, want https://trimium.example.com", cfg1.FrontendURL)
-		}
-		if cfg1.GeoIPDBPath != "./data/geoip/GeoLite2-City.mmdb" {
-			t.Errorf("got geoIPDBPath %q, want ./data/geoip/GeoLite2-City.mmdb", cfg1.GeoIPDBPath)
-		}
-		if cfg1.MongoURI != "mongodb://localhost:27017" {
-			t.Errorf("got mongoURI %q, want mongodb://localhost:27017", cfg1.MongoURI)
-		}
-		if cfg1.MongoDatabase != "trimium" {
-			t.Errorf("got mongoDatabase %q, want trimium", cfg1.MongoDatabase)
-		}
-		if cfg1.MongoMaxPoolSize != 50 {
-			t.Errorf("got mongoMaxPoolSize %d, want 50", cfg1.MongoMaxPoolSize)
-		}
-		if cfg1.MongoMinPoolSize != 5 {
-			t.Errorf("got mongoMinPoolSize %d, want 5", cfg1.MongoMinPoolSize)
-		}
-		if cfg1.MongoConnectTimeout != 3*time.Second {
-			t.Errorf("got mongoConnectTimeout %v, want 3s", cfg1.MongoConnectTimeout)
-		}
-		if cfg1.MongoPingTimeout != 2*time.Second {
-			t.Errorf("got mongoPingTimeout %v, want 2s", cfg1.MongoPingTimeout)
-		}
-		if cfg1.RedisURI != wantRedisURI {
-			t.Errorf("got redisURI %q, want %q", cfg1.RedisURI, wantRedisURI)
-		}
-		if cfg1.RedisPoolSize != 20 {
-			t.Errorf("got redisPoolSize %d, want 20", cfg1.RedisPoolSize)
-		}
-		if cfg1.RedisMinIdleConns != 5 {
-			t.Errorf("got redisMinIdleConns %d, want 5", cfg1.RedisMinIdleConns)
-		}
-		if cfg1.RedisDialTimeout != 4*time.Second {
-			t.Errorf("got redisDialTimeout %v, want 4s", cfg1.RedisDialTimeout)
-		}
-		if cfg1.RedisReadTimeout != 3*time.Second {
-			t.Errorf("got redisReadTimeout %v, want 3s", cfg1.RedisReadTimeout)
-		}
-		if cfg1.RedisWriteTimeout != 2*time.Second {
-			t.Errorf("got redisWriteTimeout %v, want 2s", cfg1.RedisWriteTimeout)
-		}
-		if cfg1.RedisPingTimeout != time.Second {
-			t.Errorf("got redisPingTimeout %v, want 1s", cfg1.RedisPingTimeout)
-		}
-
-		// Subsequent call returns cached instance even if environment changes
-		t.Setenv("PORT", "9000")
-		t.Setenv("SMTP_PORT", "9999")
-		cfg2, err := Get()
-		if err != nil {
-			t.Fatalf("unexpected error on second call: %v", err)
-		}
-		if cfg2 != cfg1 {
-			t.Errorf("expected cached instance %p, got %p", cfg1, cfg2)
-		}
-		if cfg2.Port != 3000 {
-			t.Errorf("expected cached port 3000, got %d", cfg2.Port)
-		}
-		if cfg2.SMTPPort != 2525 {
-			t.Errorf("expected cached smtpPort 2525, got %d", cfg2.SMTPPort)
-		}
-	})
-
-	t.Run("development environment selects dev URLs", func(t *testing.T) {
-		resetState()
-		if err := os.WriteFile(".env.development", []byte(""), 0600); err != nil {
-			t.Fatalf("failed to create temp .env.development: %v", err)
-		}
-		t.Cleanup(func() {
-			os.Remove(".env.development")
-		})
-
-		t.Setenv("APP_ENV", "development")
-		t.Setenv("PORT", "5000")
-		t.Setenv("SMTP_HOST", "localhost")
-		t.Setenv("SMTP_PORT", "5003")
-		t.Setenv("FROM_EMAIL", "trimium@localhost")
-		t.Setenv("BACKEND_URL_DEV", "http://localhost:5000")
-		t.Setenv("FRONTEND_URL_DEV", "http://localhost:3000")
-		t.Setenv("BACKEND_URL_PROD", "https://api.trimium.trivedi.dev")
-		t.Setenv("FRONTEND_URL_PROD", "https://trimium.vercel.app")
-		t.Setenv("GEOIP_DB_PATH", "./data/geoip/GeoLite2-City.mmdb")
-		t.Setenv("MONGO_URI", "mongodb://root:root@localhost:5002/?authSource=admin")
-		t.Setenv("MONGO_DB_NAME", "trimium")
-		t.Setenv("MONGO_MAX_POOL_SIZE", "100")
-		t.Setenv("MONGO_MIN_POOL_SIZE", "0")
-		t.Setenv("MONGO_CONNECT_TIMEOUT", "10s")
-		t.Setenv("MONGO_PING_TIMEOUT", "10s")
-		t.Setenv("REDIS_URI", "redis://localhost:5001")
-		t.Setenv("REDIS_POOL_SIZE", "10")
-		t.Setenv("REDIS_MIN_IDLE_CONNS", "0")
-		t.Setenv("REDIS_DIAL_TIMEOUT", "5s")
-		t.Setenv("REDIS_READ_TIMEOUT", "3s")
-		t.Setenv("REDIS_WRITE_TIMEOUT", "3s")
-		t.Setenv("REDIS_PING_TIMEOUT", "5s")
-
-		cfg, err := Get()
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if cfg.BackendURL != "http://localhost:5000" {
-			t.Errorf("got backendURL %q, want http://localhost:5000", cfg.BackendURL)
-		}
-		if cfg.FrontendURL != "http://localhost:3000" {
-			t.Errorf("got frontendURL %q, want http://localhost:3000", cfg.FrontendURL)
-		}
-	})
-
-	t.Run("production environment selects prod URLs over dev URLs", func(t *testing.T) {
-		resetState()
-		t.Setenv("APP_ENV", "production")
-		t.Setenv("PORT", "5000")
-		t.Setenv("SMTP_HOST", "smtp.example.com")
-		t.Setenv("SMTP_PORT", "587")
-		t.Setenv("FROM_EMAIL", "admin@example.com")
-		t.Setenv("BACKEND_URL_DEV", "http://localhost:5000")
-		t.Setenv("FRONTEND_URL_DEV", "http://localhost:3000")
-		t.Setenv("BACKEND_URL_PROD", "https://api.trimium.trivedi.dev")
-		t.Setenv("FRONTEND_URL_PROD", "https://trimium.vercel.app")
-		t.Setenv("GEOIP_DB_PATH", "./data/geoip/GeoLite2-City.mmdb")
-		t.Setenv("MONGO_URI", "mongodb://root:root@localhost:5002/?authSource=admin")
-		t.Setenv("MONGO_DB_NAME", "trimium")
-		t.Setenv("MONGO_MAX_POOL_SIZE", "100")
-		t.Setenv("MONGO_MIN_POOL_SIZE", "0")
-		t.Setenv("MONGO_CONNECT_TIMEOUT", "10s")
-		t.Setenv("MONGO_PING_TIMEOUT", "10s")
-		t.Setenv("REDIS_URI", "redis://localhost:5001")
-		t.Setenv("REDIS_POOL_SIZE", "10")
-		t.Setenv("REDIS_MIN_IDLE_CONNS", "0")
-		t.Setenv("REDIS_DIAL_TIMEOUT", "5s")
-		t.Setenv("REDIS_READ_TIMEOUT", "3s")
-		t.Setenv("REDIS_WRITE_TIMEOUT", "3s")
-		t.Setenv("REDIS_PING_TIMEOUT", "5s")
-
-		cfg, err := Get()
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if cfg.BackendURL != "https://api.trimium.trivedi.dev" {
-			t.Errorf("got backendURL %q, want https://api.trimium.trivedi.dev", cfg.BackendURL)
-		}
-		if cfg.FrontendURL != "https://trimium.vercel.app" {
-			t.Errorf("got frontendURL %q, want https://trimium.vercel.app", cfg.FrontendURL)
-		}
-	})
+	second, secondErr := Get()
+	if second != nil {
+		t.Fatalf("second Get() config = %#v, want nil", second)
+	}
+	if secondErr == nil {
+		t.Fatal("second Get() error = nil, want error")
+	}
+	if secondErr.Error() != firstErr.Error() {
+		t.Errorf("second Get() error = %q, want cached error %q", secondErr, firstErr)
+	}
 }
