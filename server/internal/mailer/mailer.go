@@ -54,7 +54,11 @@ func Get() *Client {
 	return instance
 }
 
-func (c *Client) Send(from string, to []string, subject, htmlBody string) error {
+func (c *Client) Send(ctx context.Context, from string, to []string, subject, htmlBody string) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	if len(to) == 0 {
 		return errors.New("mailer: no recipients")
 	}
@@ -77,6 +81,10 @@ func (c *Client) Send(from string, to []string, subject, htmlBody string) error 
 		return errors.New("mailer: subject must not contain line breaks")
 	}
 
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("mailer: send aborted: %w", err)
+	}
+
 	msg := gomail.NewMsg()
 	if err := msg.From(sender.Address); err != nil {
 		return fmt.Errorf("mailer: invalid from address: %w", err)
@@ -89,7 +97,7 @@ func (c *Client) Send(from string, to []string, subject, htmlBody string) error 
 	msg.Subject(subject)
 	msg.SetBodyString(gomail.TypeTextHTML, htmlBody)
 
-	if err := c.client.DialAndSend(msg); err != nil {
+	if err := c.client.DialAndSendWithContext(ctx, msg); err != nil {
 		return fmt.Errorf("mailer: send failed: %w", err)
 	}
 
@@ -97,6 +105,10 @@ func (c *Client) Send(from string, to []string, subject, htmlBody string) error 
 }
 
 func (c *Client) Verify(ctx context.Context) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	if err := c.client.DialWithContext(ctx); err != nil {
 		return fmt.Errorf("mailer: dial/auth failed: %w", err)
 	}
