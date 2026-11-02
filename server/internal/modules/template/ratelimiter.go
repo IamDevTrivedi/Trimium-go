@@ -10,6 +10,6 @@ type RateLimiter interface {
 type rateLimiter struct {
 }
 
-func NewRateLimiter(store *database.Redis) RateLimiter {
+func NewRateLimiter(_ *database.Redis) RateLimiter {
 	return &rateLimiter{}
 }

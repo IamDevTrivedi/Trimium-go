@@ -2,5 +2,5 @@ package auth
 
 import "github.com/gin-gonic/gin"
 
-func RegisterRoutes(router gin.IRouter, rl RateLimiter, h Handler) {
+func RegisterRoutes(_ gin.IRouter, _ RateLimiter, _ Handler) {
 }
