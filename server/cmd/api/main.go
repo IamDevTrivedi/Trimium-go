@@ -20,6 +20,11 @@ import (
 	"server/internal/modules/root"
 )
 
+const (
+	closeTimeout    = 5 * time.Second  // releasing database connections
+	shutdownTimeout = 10 * time.Second // graceful HTTP server shutdown
+)
+
 func main() {
 	log := logger.Get()
 	if err := run(); err != nil {
@@ -29,7 +34,9 @@ func main() {
 }
 
 func run() error {
-	// getting the logger instance
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
 	log := logger.Get()
 	log.Info("Initialize the process")
 
@@ -42,7 +49,9 @@ func run() error {
 	log.Info("Environment is valid")
 
 	// making a connection with the mongo database
-	mongoStore, err := database.NewMongo(context.Background(), cfg.MongoURI, cfg.MongoDatabase, database.MongoOptions{
+	mongoStore, err := database.NewMongo(ctx, database.MongoOptions{
+		URI:            cfg.MongoURI,
+		Database:       cfg.MongoDatabase,
 		MaxPoolSize:    cfg.MongoMaxPoolSize,
 		MinPoolSize:    cfg.MongoMinPoolSize,
 		ConnectTimeout: cfg.MongoConnectTimeout,
@@ -54,7 +63,7 @@ func run() error {
 	}
 
 	defer func() {
-		closeCtx, closeCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		closeCtx, closeCancel := context.WithTimeout(context.Background(), closeTimeout)
 		defer closeCancel()
 
 		if err := mongoStore.Close(closeCtx); err != nil {
@@ -65,7 +74,8 @@ func run() error {
 	log.Info("MongoDB connection established")
 
 	// making a connection with the redis database
-	redisStore, err := database.NewRedis(context.Background(), cfg.RedisURI, database.RedisOptions{
+	redisStore, err := database.NewRedis(ctx, database.RedisOptions{
+		URI:          cfg.RedisURI,
 		PoolSize:     cfg.RedisPoolSize,
 		MinIdleConns: cfg.RedisMinIdleConns,
 		DialTimeout:  cfg.RedisDialTimeout,
@@ -73,11 +83,9 @@ func run() error {
 		WriteTimeout: cfg.RedisWriteTimeout,
 		PingTimeout:  cfg.RedisPingTimeout,
 	})
-
 	if err != nil {
 		return fmt.Errorf("redis error: %w", err)
 	}
-
 	defer func() {
 		if err := redisStore.Close(); err != nil {
 			log.Error(fmt.Sprintf("failed to close Redis connection: %v", err))
@@ -100,7 +108,11 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("failed to initialize GeoResolver: %w", err)
 	}
-	defer geo.Close()
+	defer func() {
+		if err := geo.Close(); err != nil {
+			log.Error(fmt.Sprintf("failed to close GeoResolver: %v", err))
+		}
+	}()
 
 	router.Use(
 		gin.Recovery(),
@@ -128,6 +140,7 @@ func run() error {
 		Addr:              fmt.Sprintf(":%d", cfg.Port),
 		Handler:           router,
 		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       60 * time.Second,
 	}
 
 	// starting the server in a separate goroutine to allow graceful shutdown
@@ -140,19 +153,14 @@ func run() error {
 		}
 	}()
 
-	// waiting for termination signal to gracefully shutdown the server
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-
 	select {
 	case err := <-serverErr:
 		return err
-	case <-quit:
+	case <-ctx.Done():
+		log.Info("Shutdown signal received")
 	}
 
-	log.Info("Shutting down server...")
-
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer shutdownCancel()
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
