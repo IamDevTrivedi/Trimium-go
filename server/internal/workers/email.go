@@ -3,11 +3,12 @@ package workers
 import (
 	"context"
 	"fmt"
+
+	"github.com/hibiken/asynq"
+
 	"server/internal/logger"
 	"server/internal/mailer"
 	"server/internal/tasks"
-
-	"github.com/hibiken/asynq"
 )
 
 type EmailWorker struct {
@@ -21,7 +22,7 @@ func NewEmailWorker(m *mailer.Client) *EmailWorker {
 func (w *EmailWorker) HandleEmailSend(ctx context.Context, t *asynq.Task) error {
 	payload, err := tasks.ParseEmailPayload(t)
 	if err != nil {
-		return fmt.Errorf("parse email task: %v: %w", err, asynq.SkipRetry)
+		return fmt.Errorf("parse email task: %w: %w", err, asynq.SkipRetry)
 	}
 
 	log := logger.Get()

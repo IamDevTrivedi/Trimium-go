@@ -2,13 +2,14 @@ package main
 
 import (
 	"fmt"
+
+	"github.com/hibiken/asynq"
+
 	"server/internal/config"
 	"server/internal/logger"
 	"server/internal/mailer"
 	"server/internal/tasks"
 	"server/internal/workers"
-
-	"github.com/hibiken/asynq"
 )
 
 const (

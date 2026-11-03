@@ -40,6 +40,7 @@ func validEnvValues(geoIPPath string) map[string]string {
 		"REDIS_PORT":            "6379",
 		"REDIS_USERNAME":        "",
 		"REDIS_PASSWORD":        "",
+		"REDIS_DB":              "0",
 		"ASYNQ_CONCURRENCY":     "10",
 		"REDIS_POOL_SIZE":       "10",
 		"REDIS_MIN_IDLE_CONNS":  "2",
