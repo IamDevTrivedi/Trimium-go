@@ -42,8 +42,7 @@
 │       │   ├── logger.go
 │       │   └── logger_test.go
 │       ├── mailer
-│       │   ├── mailer.go
-│       │   └── mailer_test.go
+│       │   └── mailer.go
 │       ├── middleware
 │       │   ├── httplogger.go
 │       │   ├── httplogger_test.go
@@ -70,22 +69,29 @@
 │       │   │   ├── route_test.go
 │       │   │   ├── service.go
 │       │   │   └── service_test.go
-│       │   └── root
+│       │   ├── root
+│       │   │   ├── handler.go
+│       │   │   ├── handler_test.go
+│       │   │   ├── module.go
+│       │   │   ├── module_test.go
+│       │   │   ├── ratelimiter.go
+│       │   │   ├── ratelimiter_test.go
+│       │   │   ├── repository.go
+│       │   │   ├── repository_test.go
+│       │   │   ├── route.go
+│       │   │   ├── route_test.go
+│       │   │   ├── service.go
+│       │   │   └── service_test.go
+│       │   └── template
 │       │       ├── handler.go
-│       │       ├── handler_test.go
 │       │       ├── module.go
-│       │       ├── module_test.go
 │       │       ├── ratelimiter.go
-│       │       ├── ratelimiter_test.go
 │       │       ├── repository.go
-│       │       ├── repository_test.go
 │       │       ├── route.go
-│       │       ├── route_test.go
-│       │       ├── service.go
-│       │       └── service_test.go
+│       │       └── service.go
 │       └── response
 │           ├── response.go
 │           └── response_test.go
 └── skills-lock.json
 
-21 directories, 68 files
+22 directories, 73 files
