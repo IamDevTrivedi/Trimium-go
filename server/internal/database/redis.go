@@ -2,7 +2,6 @@ package database
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -10,7 +9,10 @@ import (
 )
 
 type RedisOptions struct {
-	URI          string
+	Host         string
+	Port         int
+	Username     string
+	Password     string
 	PoolSize     int
 	MinIdleConns int
 	DialTimeout  time.Duration
@@ -24,12 +26,11 @@ type Redis struct {
 }
 
 func NewRedis(ctx context.Context, opts RedisOptions) (*Redis, error) {
-	if opts.URI == "" {
-		return nil, errors.New("redis: uri is required")
+	if opts.Host == "" {
+		return nil, fmt.Errorf("redis: host is required")
 	}
-	redisOpts, err := redis.ParseURL(opts.URI)
-	if err != nil {
-		return nil, fmt.Errorf("redis: invalid uri: %w", err)
+	if opts.Port <= 0 || opts.Port > 65535 {
+		return nil, fmt.Errorf("redis: invalid port %d", opts.Port)
 	}
 	if opts.PoolSize <= 0 {
 		return nil, fmt.Errorf("redis: pool size %d must be greater than zero", opts.PoolSize)
@@ -57,13 +58,16 @@ func NewRedis(ctx context.Context, opts RedisOptions) (*Redis, error) {
 		return nil, fmt.Errorf("redis: ping timeout %v must be greater than zero", opts.PingTimeout)
 	}
 
-	redisOpts.PoolSize = opts.PoolSize
-	redisOpts.MinIdleConns = opts.MinIdleConns
-	redisOpts.DialTimeout = opts.DialTimeout
-	redisOpts.ReadTimeout = opts.ReadTimeout
-	redisOpts.WriteTimeout = opts.WriteTimeout
-
-	client := redis.NewClient(redisOpts)
+	client := redis.NewClient(&redis.Options{
+		Addr:         fmt.Sprintf("%s:%d", opts.Host, opts.Port),
+		Username:     opts.Username,
+		Password:     opts.Password,
+		PoolSize:     opts.PoolSize,
+		MinIdleConns: opts.MinIdleConns,
+		DialTimeout:  opts.DialTimeout,
+		ReadTimeout:  opts.ReadTimeout,
+		WriteTimeout: opts.WriteTimeout,
+	})
 
 	r := &Redis{client: client}
 

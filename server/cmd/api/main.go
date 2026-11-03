@@ -75,7 +75,10 @@ func run() error {
 
 	// making a connection with the redis database
 	redisStore, err := database.NewRedis(ctx, database.RedisOptions{
-		URI:          cfg.RedisURI,
+		Host:         cfg.RedisHost,
+		Port:         cfg.RedisPort,
+		Username:     cfg.RedisUsername,
+		Password:     cfg.RedisPassword,
 		PoolSize:     cfg.RedisPoolSize,
 		MinIdleConns: cfg.RedisMinIdleConns,
 		DialTimeout:  cfg.RedisDialTimeout,

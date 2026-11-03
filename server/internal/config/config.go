@@ -32,13 +32,17 @@ type Config struct {
 	MongoMinPoolSize    uint64        `env:"MONGO_MIN_POOL_SIZE,required,notEmpty"   validate:"ltefield=MongoMaxPoolSize"`
 	MongoConnectTimeout time.Duration `env:"MONGO_CONNECT_TIMEOUT,required,notEmpty" validate:"gt=0"`
 	MongoPingTimeout    time.Duration `env:"MONGO_PING_TIMEOUT,required,notEmpty"    validate:"gt=0"`
-	RedisURI            string        `env:"REDIS_URI,required,notEmpty"            validate:"uri"`
+	RedisHost           string        `env:"REDIS_HOST,required,notEmpty"           validate:"hostname|ip"`
+	RedisPort           int           `env:"REDIS_PORT,required,notEmpty"           validate:"min=1,max=65535"`
+	RedisUsername       string        `env:"REDIS_USERNAME"`
+	RedisPassword       string        `env:"REDIS_PASSWORD"`
 	RedisPoolSize       int           `env:"REDIS_POOL_SIZE,required,notEmpty"      validate:"min=1"`
 	RedisMinIdleConns   int           `env:"REDIS_MIN_IDLE_CONNS,required,notEmpty" validate:"min=0,ltefield=RedisPoolSize"`
 	RedisDialTimeout    time.Duration `env:"REDIS_DIAL_TIMEOUT,required,notEmpty"   validate:"gt=0"`
 	RedisReadTimeout    time.Duration `env:"REDIS_READ_TIMEOUT,required,notEmpty"   validate:"gt=0"`
 	RedisWriteTimeout   time.Duration `env:"REDIS_WRITE_TIMEOUT,required,notEmpty"  validate:"gt=0"`
 	RedisPingTimeout    time.Duration `env:"REDIS_PING_TIMEOUT,required,notEmpty"   validate:"gt=0"`
+	AsynqConcurrency    int           `env:"ASYNQ_CONCURRENCY,required,notEmpty"    validate:"min=1"`
 }
 
 var (

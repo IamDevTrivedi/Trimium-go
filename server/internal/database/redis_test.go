@@ -13,7 +13,8 @@ import (
 // a port where nothing listens, so tests never need a running Redis.
 func unreachableRedisOptions() RedisOptions {
 	return RedisOptions{
-		URI:          "redis://127.0.0.1:1",
+		Host:         "127.0.0.1",
+		Port:         1,
 		PoolSize:     10,
 		MinIdleConns: 0,
 		DialTimeout:  500 * time.Millisecond,
@@ -30,14 +31,19 @@ func TestNewRedis_Validation(t *testing.T) {
 		wantErr string
 	}{
 		{
-			name:    "empty uri",
-			mutate:  func(o *RedisOptions) { o.URI = "" },
-			wantErr: "redis: uri is required",
+			name:    "empty host",
+			mutate:  func(o *RedisOptions) { o.Host = "" },
+			wantErr: "redis: host is required",
 		},
 		{
-			name:    "invalid uri scheme",
-			mutate:  func(o *RedisOptions) { o.URI = "http://127.0.0.1:6379" },
-			wantErr: "redis: invalid uri:",
+			name:    "invalid port zero",
+			mutate:  func(o *RedisOptions) { o.Port = 0 },
+			wantErr: "redis: invalid port 0",
+		},
+		{
+			name:    "invalid port too high",
+			mutate:  func(o *RedisOptions) { o.Port = 99999 },
+			wantErr: "redis: invalid port 99999",
 		},
 		{
 			name:    "pool size zero",
