@@ -13,6 +13,7 @@ type RedisOptions struct {
 	Port         int
 	Username     string
 	Password     string
+	DB           int
 	PoolSize     int
 	MinIdleConns int
 	DialTimeout  time.Duration
@@ -62,6 +63,7 @@ func NewRedis(ctx context.Context, opts RedisOptions) (*Redis, error) {
 		Addr:         fmt.Sprintf("%s:%d", opts.Host, opts.Port),
 		Username:     opts.Username,
 		Password:     opts.Password,
+		DB:           opts.DB,
 		PoolSize:     opts.PoolSize,
 		MinIdleConns: opts.MinIdleConns,
 		DialTimeout:  opts.DialTimeout,

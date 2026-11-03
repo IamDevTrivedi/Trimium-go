@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/hibiken/asynq"
 
 	"server/internal/config"
 	"server/internal/database"
@@ -18,6 +19,7 @@ import (
 	"server/internal/middleware"
 	"server/internal/modules/health"
 	"server/internal/modules/root"
+	"server/internal/tasks"
 )
 
 const (
@@ -79,6 +81,7 @@ func run() error {
 		Port:         cfg.RedisPort,
 		Username:     cfg.RedisUsername,
 		Password:     cfg.RedisPassword,
+		DB:           cfg.RedisDB,
 		PoolSize:     cfg.RedisPoolSize,
 		MinIdleConns: cfg.RedisMinIdleConns,
 		DialTimeout:  cfg.RedisDialTimeout,
@@ -96,6 +99,38 @@ func run() error {
 	}()
 
 	log.Info("Redis connection established")
+
+	queue := asynq.NewClient(asynq.RedisClientOpt{
+		Addr:         fmt.Sprintf("%s:%d", cfg.RedisHost, cfg.RedisPort),
+		Username:     cfg.RedisUsername,
+		Password:     cfg.RedisPassword,
+		DB:           cfg.RedisDB,
+		DialTimeout:  cfg.RedisDialTimeout,
+		ReadTimeout:  cfg.RedisReadTimeout,
+		WriteTimeout: cfg.RedisWriteTimeout,
+		PoolSize:     cfg.RedisPoolSize,
+	})
+	defer queue.Close()
+
+	for range 5 {
+		payload := &tasks.EmailPayload{
+			FromEmail: "hello@example.com",
+			ToEmail:   []string{"user1@example.com", "user2@example.com"},
+			Subject:   "Welcome to our service",
+			HTMLBody:  "<h1>Welcome!</h1><p>Thank you for joining our service.</p>",
+		}
+
+		task, err := tasks.NewEmailTask(payload)
+		if err != nil {
+			log.Error(fmt.Sprintf("could not create email task: %v", err))
+			continue
+		}
+
+		if _, err := queue.Enqueue(task); err != nil {
+			log.Error(fmt.Sprintf("could not enqueue email task: %v", err))
+			continue
+		}
+	}
 
 	// setting the gin mode based on the environment
 	if cfg.AppEnv == "production" {

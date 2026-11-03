@@ -36,6 +36,7 @@ type Config struct {
 	RedisPort           int           `env:"REDIS_PORT,required,notEmpty"           validate:"min=1,max=65535"`
 	RedisUsername       string        `env:"REDIS_USERNAME"`
 	RedisPassword       string        `env:"REDIS_PASSWORD"`
+	RedisDB             int           `env:"REDIS_DB,required,notEmpty"             validate:"min=0,max=15"`
 	RedisPoolSize       int           `env:"REDIS_POOL_SIZE,required,notEmpty"      validate:"min=1"`
 	RedisMinIdleConns   int           `env:"REDIS_MIN_IDLE_CONNS,required,notEmpty" validate:"min=0,ltefield=RedisPoolSize"`
 	RedisDialTimeout    time.Duration `env:"REDIS_DIAL_TIMEOUT,required,notEmpty"   validate:"gt=0"`
