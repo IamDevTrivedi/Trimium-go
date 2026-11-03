@@ -172,8 +172,8 @@ func run() error {
 	)
 
 	// registering routes
-	root.Register(router, redisStore, mongoStore)
-	health.Register(router, redisStore, mongoStore)
+	root.Register(router, redisStore, mongoStore, queue)
+	health.Register(router, redisStore, mongoStore, queue)
 
 	// starting the HTTP server
 	srv := &http.Server{

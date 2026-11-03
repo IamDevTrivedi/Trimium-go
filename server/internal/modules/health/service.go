@@ -3,6 +3,8 @@ package health
 import (
 	"context"
 	"time"
+
+	"github.com/hibiken/asynq"
 )
 
 const pingTimeout = 2 * time.Second
@@ -18,11 +20,15 @@ type Service interface {
 }
 
 type service struct {
-	repo Repository
+	repo  Repository
+	queue *asynq.Client
 }
 
-func NewService(repo Repository) Service {
-	return &service{repo: repo}
+func NewService(repo Repository, queue *asynq.Client) Service {
+	return &service{
+		repo:  repo,
+		queue: queue,
+	}
 }
 
 func (s *service) GetAppStatus(_ context.Context) (*StatusResponse, error) {

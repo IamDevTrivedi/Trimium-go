@@ -8,13 +8,13 @@ import (
 type mockRepository struct{}
 
 func TestNewService(t *testing.T) {
-	if svc := NewService(&mockRepository{}); svc == nil {
+	if svc := NewService(&mockRepository{}, nil); svc == nil {
 		t.Fatal("expected NewService to return a non-nil service")
 	}
 }
 
 func TestService_GetAppInfo(t *testing.T) {
-	svc := NewService(&mockRepository{})
+	svc := NewService(&mockRepository{}, nil)
 
 	got, err := svc.GetAppInfo(context.Background())
 	if err != nil {

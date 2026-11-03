@@ -27,7 +27,7 @@ func (m *mockRepository) PingMongo(ctx context.Context) error {
 }
 
 func TestNewService(t *testing.T) {
-	if svc := NewService(&mockRepository{}); svc == nil {
+	if svc := NewService(&mockRepository{}, nil); svc == nil {
 		t.Fatal("expected NewService to return a non-nil service")
 	}
 }
@@ -37,7 +37,7 @@ func TestService_GetAppStatus(t *testing.T) {
 	svc := NewService(&mockRepository{
 		pingRedis: func(context.Context) error { called = true; return nil },
 		pingMongo: func(context.Context) error { called = true; return nil },
-	})
+	}, nil)
 
 	got, err := svc.GetAppStatus(t.Context())
 	if err != nil {
@@ -95,7 +95,7 @@ func TestService_DatastoreStatus(t *testing.T) {
 				tt.ping(repo, func(context.Context) error { return sentinel })
 			}
 
-			got, err := tt.get(NewService(repo))
+			got, err := tt.get(NewService(repo, nil))
 
 			if tt.wantOK {
 				if err != nil {
@@ -149,7 +149,7 @@ func TestService_DatastorePingUsesTimeout(t *testing.T) {
 				return nil
 			})
 
-			if _, err := tt.get(NewService(repo), t.Context()); err != nil {
+			if _, err := tt.get(NewService(repo, nil), t.Context()); err != nil {
 				t.Fatalf("expected nil error, got %v", err)
 			}
 
