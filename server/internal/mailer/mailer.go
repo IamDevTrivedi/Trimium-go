@@ -120,32 +120,32 @@ func (c *Client) Send(
 
 	sender, err := mail.ParseAddress(from)
 	if err != nil {
-		return fmt.Errorf("%w: %q: %v", ErrInvalidFrom, from, err)
+		return fmt.Errorf("%w: %q: %w", ErrInvalidFrom, from, err)
 	}
 
 	rcpts := make([]string, 0, len(to))
 	for _, t := range to {
 		a, err := mail.ParseAddress(t)
 		if err != nil {
-			return fmt.Errorf("%w: %q: %v", ErrInvalidRecipient, t, err)
+			return fmt.Errorf("%w: %q: %w", ErrInvalidRecipient, t, err)
 		}
 		rcpts = append(rcpts, a.Address)
 	}
 
 	msg := gomail.NewMsg()
 	if err := msg.From(sender.Address); err != nil {
-		return fmt.Errorf("%w: %v", ErrInvalidFrom, err)
+		return fmt.Errorf("%w: %w", ErrInvalidFrom, err)
 	}
 
 	if err := msg.To(rcpts...); err != nil {
-		return fmt.Errorf("%w: %v", ErrInvalidRecipient, err)
+		return fmt.Errorf("%w: %w", ErrInvalidRecipient, err)
 	}
 
 	msg.Subject(subject)
 	msg.SetBodyString(gomail.TypeTextHTML, htmlBody)
 
 	if err := c.client.DialAndSendWithContext(ctx, msg); err != nil {
-		return fmt.Errorf("%w: %v", ErrDialAndSend, err)
+		return fmt.Errorf("%w: %w", ErrDialAndSend, err)
 	}
 
 	return nil

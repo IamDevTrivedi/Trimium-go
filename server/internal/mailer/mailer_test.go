@@ -50,7 +50,8 @@ type testSMTPServer struct {
 func newTestSMTPServer(t *testing.T, cfg serverConfig) *testSMTPServer {
 	t.Helper()
 
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	var lc net.ListenConfig
+	ln, err := lc.Listen(context.Background(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("start test SMTP server: %v", err)
 	}
@@ -75,7 +76,11 @@ func newTestSMTPServer(t *testing.T, cfg serverConfig) *testSMTPServer {
 }
 
 func (s *testSMTPServer) port() int {
-	return s.ln.Addr().(*net.TCPAddr).Port
+	tcpAddr, ok := s.ln.Addr().(*net.TCPAddr)
+	if !ok {
+		return 0
+	}
+	return tcpAddr.Port
 }
 
 func (s *testSMTPServer) acceptLoop() {
@@ -195,7 +200,6 @@ func (s *testSMTPServer) handleAuthPlain(conn net.Conn, br *bufio.Reader, line s
 	if fields := strings.SplitN(line, " ", 3); len(fields) == 3 {
 		payload = fields[2]
 	} else {
-
 		if _, err := conn.Write([]byte("334 " + crlf)); err != nil {
 			return false
 		}
@@ -263,11 +267,16 @@ func (s *testSMTPServer) authSnapshot() (attempts int, user, pass string) {
 
 func closedTCPPort(t *testing.T) int {
 	t.Helper()
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	var lc net.ListenConfig
+	ln, err := lc.Listen(context.Background(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("pick closed port: %v", err)
 	}
-	port := ln.Addr().(*net.TCPAddr).Port
+	tcpAddr, ok := ln.Addr().(*net.TCPAddr)
+	if !ok {
+		t.Fatalf("unexpected addr type: %T", ln.Addr())
+	}
+	port := tcpAddr.Port
 	_ = ln.Close()
 	return port
 }
@@ -459,7 +468,6 @@ func TestClose(t *testing.T) {
 }
 
 func TestSendValidationErrors(t *testing.T) {
-
 	c := newTestClient(t, "127.0.0.1", closedTCPPort(t), TLSNone)
 
 	tests := []struct {
@@ -562,7 +570,6 @@ func TestSendDialFailure(t *testing.T) {
 }
 
 func TestSendTLSMandatoryFailsWithoutSTARTTLS(t *testing.T) {
-
 	srv := newTestSMTPServer(t, serverConfig{})
 	c := newTestClient(t, "127.0.0.1", srv.port(), TLSMandatory)
 
@@ -689,7 +696,6 @@ func TestSendWithAuth(t *testing.T) {
 }
 
 func TestSendOpportunisticTLSFallsBackToPlaintext(t *testing.T) {
-
 	srv := newTestSMTPServer(t, serverConfig{})
 	c := newTestClient(t, "127.0.0.1", srv.port(), TLSOpportunistic)
 
