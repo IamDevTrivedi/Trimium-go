@@ -112,7 +112,7 @@ func run() error {
 	})
 	defer queue.Close()
 
-	for range 5 {
+	for range 500 {
 		payload := &tasks.EmailPayload{
 			FromEmail: "hello@example.com",
 			ToEmail:   []string{"user1@example.com", "user2@example.com"},
@@ -130,6 +130,8 @@ func run() error {
 			log.Error(fmt.Sprintf("could not enqueue email task: %v", err))
 			continue
 		}
+
+		fmt.Println("aaaaaa")
 	}
 
 	// setting the gin mode based on the environment
