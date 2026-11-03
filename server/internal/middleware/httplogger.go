@@ -14,7 +14,8 @@ import (
 // entry per HTTP request. Severity scales with the response status:
 // 5xx logs at ERROR, 4xx logs at WARN, everything else logs at INFO.
 func RequestLogger() gin.HandlerFunc {
-	return requestLogger(logger.Get())
+	log := logger.Get()
+	return requestLogger(log)
 }
 
 // requestLogger builds the middleware around a specific logger so tests can

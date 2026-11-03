@@ -101,7 +101,8 @@ func RateLimiter(config RateLimiterConfig) gin.HandlerFunc {
 			member,
 		).Int64()
 		if err != nil {
-			logger.Get().Error("rate limiter: redis unavailable", "error", err)
+			log := logger.Get()
+			log.Error("rate limiter: redis unavailable", "error", err)
 			c.Next()
 			return
 		}

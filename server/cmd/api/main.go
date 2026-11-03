@@ -21,17 +21,17 @@ import (
 )
 
 func main() {
-	logger := logger.Get()
+	log := logger.Get()
 	if err := run(); err != nil {
-		logger.Error(fmt.Sprintf("Application error: %v", err))
+		log.Error(fmt.Sprintf("Application error: %v", err))
 		os.Exit(1)
 	}
 }
 
 func run() error {
 	// getting the logger instance
-	logger := logger.Get()
-	logger.Info("Initialize the process")
+	log := logger.Get()
+	log.Info("Initialize the process")
 
 	// loading the application configuration
 	cfg, err := config.Get()
@@ -39,7 +39,7 @@ func run() error {
 		return fmt.Errorf("config error: %w", err)
 	}
 
-	logger.Info("Environment is valid")
+	log.Info("Environment is valid")
 
 	// making a connection with the mongo database
 	mongoStore, err := database.NewMongo(context.Background(), cfg.MongoURI, cfg.MongoDatabase, database.MongoOptions{
@@ -58,11 +58,11 @@ func run() error {
 		defer closeCancel()
 
 		if err := mongoStore.Close(closeCtx); err != nil {
-			logger.Error(fmt.Sprintf("failed to close MongoDB connection: %v", err))
+			log.Error(fmt.Sprintf("failed to close MongoDB connection: %v", err))
 		}
 	}()
 
-	logger.Info("MongoDB connection established")
+	log.Info("MongoDB connection established")
 
 	// making a connection with the redis database
 	redisStore, err := database.NewRedis(context.Background(), cfg.RedisURI, database.RedisOptions{
@@ -80,11 +80,11 @@ func run() error {
 
 	defer func() {
 		if err := redisStore.Close(); err != nil {
-			logger.Error(fmt.Sprintf("failed to close Redis connection: %v", err))
+			log.Error(fmt.Sprintf("failed to close Redis connection: %v", err))
 		}
 	}()
 
-	logger.Info("Redis connection established")
+	log.Info("Redis connection established")
 
 	// setting the gin mode based on the environment
 	if cfg.AppEnv == "production" {
@@ -134,7 +134,7 @@ func run() error {
 	serverErr := make(chan error, 1)
 
 	go func() {
-		logger.Info(fmt.Sprintf("Server listening on port %d", cfg.Port))
+		log.Info(fmt.Sprintf("Server listening on port %d", cfg.Port))
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			serverErr <- fmt.Errorf("server failed to start: %w", err)
 		}
@@ -150,7 +150,7 @@ func run() error {
 	case <-quit:
 	}
 
-	logger.Info("Shutting down server...")
+	log.Info("Shutting down server...")
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer shutdownCancel()
@@ -159,7 +159,7 @@ func run() error {
 		return fmt.Errorf("server forced to shutdown: %w", err)
 	}
 
-	logger.Info("Server stopped cleanly")
+	log.Info("Server stopped cleanly")
 
 	return nil
 }
