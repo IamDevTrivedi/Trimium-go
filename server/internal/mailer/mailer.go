@@ -6,114 +6,147 @@ import (
 	"fmt"
 	"net/mail"
 	"strings"
-	"sync"
 
 	gomail "github.com/wneessen/go-mail"
-
-	"server/internal/config"
 )
+
+var (
+	ErrNoRecipients     = errors.New("mailer: no recipients")
+	ErrInvalidFrom      = errors.New("mailer: invalid from address")
+	ErrInvalidRecipient = errors.New("mailer: invalid recipient address")
+	ErrInvalidSubject   = errors.New("mailer: subject must not contain line breaks")
+	ErrDialAndSend      = errors.New("mailer: dial/send failed")
+	ErrAlreadyClosed    = errors.New("mailer: client already closed")
+)
+
+type TLSPolicy int
+
+const (
+	TLSMandatory TLSPolicy = iota
+	TLSOpportunistic
+	TLSNone
+)
+
+func (p TLSPolicy) toGomail() (gomail.TLSPolicy, error) {
+	switch p {
+	case TLSMandatory:
+		return gomail.TLSMandatory, nil
+	case TLSOpportunistic:
+		return gomail.TLSOpportunistic, nil
+	case TLSNone:
+		return gomail.NoTLS, nil
+	default:
+		return 0, fmt.Errorf("mailer: invalid TLS policy %d", p)
+	}
+}
+
+type Options struct {
+	Host     string
+	Port     int
+	Username string
+	Password string
+	TLS      TLSPolicy
+}
 
 type Client struct {
 	client *gomail.Client
 }
 
-var (
-	instance *Client
-	once     sync.Once
-)
+func New(opts Options) (*Client, error) {
+	if opts.Host == "" {
+		return nil, errors.New("mailer: host is required")
+	}
 
-func Get() *Client {
-	once.Do(func() {
-		cfg, _ := config.Get()
+	if opts.Port <= 0 || opts.Port > 65535 {
+		return nil, fmt.Errorf("mailer: invalid port %d", opts.Port)
+	}
 
-		host := cfg.SMTPHost
-		port := cfg.SMTPPort
-		username := cfg.SMTPUsername
-		password := cfg.SMTPPassword
+	policy, err := opts.TLS.toGomail()
+	if err != nil {
+		return nil, err
+	}
 
-		opts := []gomail.Option{
-			gomail.WithPort(port),
-			gomail.WithTLSPolicy(gomail.TLSOpportunistic),
-		}
+	mailOpts := []gomail.Option{
+		gomail.WithPort(opts.Port),
+		gomail.WithTLSPolicy(policy),
+	}
 
-		if username != "" {
-			opts = append(opts,
-				gomail.WithSMTPAuth(gomail.SMTPAuthPlain),
-				gomail.WithUsername(username),
-				gomail.WithPassword(password),
-			)
-		}
+	if opts.Username != "" {
+		mailOpts = append(mailOpts,
+			gomail.WithSMTPAuth(gomail.SMTPAuthPlain),
+			gomail.WithUsername(opts.Username),
+			gomail.WithPassword(opts.Password),
+		)
+	}
 
-		c, err := gomail.NewClient(host, opts...)
-		if err != nil {
-			panic(fmt.Sprintf("mailer: failed to create client: %v", err))
-		}
+	c, err := gomail.NewClient(opts.Host, mailOpts...)
 
-		instance = &Client{client: c}
-	})
-	return instance
+	if err != nil {
+		return nil, fmt.Errorf("mailer: create client: %w", err)
+	}
+
+	return &Client{client: c}, nil
 }
 
-func (c *Client) Send(ctx context.Context, from string, to []string, subject, htmlBody string) error {
-	if ctx == nil {
-		ctx = context.Background()
+func (c *Client) Close() error {
+	if c == nil || c.client == nil {
+		return ErrAlreadyClosed
+	}
+
+	if err := c.client.Close(); err != nil {
+		return fmt.Errorf("mailer: close: %w", err)
+	}
+
+	return nil
+}
+
+func (c *Client) Send(
+	ctx context.Context,
+	from string,
+	to []string,
+	subject, htmlBody string,
+) error {
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("mailer: send aborted: %w", err)
 	}
 
 	if len(to) == 0 {
-		return errors.New("mailer: no recipients")
+		return ErrNoRecipients
+	}
+
+	if strings.ContainsAny(subject, "\r\n") {
+		return ErrInvalidSubject
 	}
 
 	sender, err := mail.ParseAddress(from)
 	if err != nil {
-		return fmt.Errorf("mailer: invalid from address: %w", err)
+		return fmt.Errorf("%w: %q: %v", ErrInvalidFrom, from, err)
 	}
 
 	rcpts := make([]string, 0, len(to))
 	for _, t := range to {
 		a, err := mail.ParseAddress(t)
 		if err != nil {
-			return fmt.Errorf("mailer: invalid to address %q: %w", t, err)
+			return fmt.Errorf("%w: %q: %v", ErrInvalidRecipient, t, err)
 		}
 		rcpts = append(rcpts, a.Address)
 	}
 
-	if strings.ContainsAny(subject, "\r\n") {
-		return errors.New("mailer: subject must not contain line breaks")
-	}
-
-	if err := ctx.Err(); err != nil {
-		return fmt.Errorf("mailer: send aborted: %w", err)
-	}
-
 	msg := gomail.NewMsg()
 	if err := msg.From(sender.Address); err != nil {
-		return fmt.Errorf("mailer: invalid from address: %w", err)
+		return fmt.Errorf("%w: %v", ErrInvalidFrom, err)
 	}
 
 	if err := msg.To(rcpts...); err != nil {
-		return fmt.Errorf("mailer: invalid to address: %w", err)
+		return fmt.Errorf("%w: %v", ErrInvalidRecipient, err)
 	}
 
 	msg.Subject(subject)
 	msg.SetBodyString(gomail.TypeTextHTML, htmlBody)
 
 	if err := c.client.DialAndSendWithContext(ctx, msg); err != nil {
-		return fmt.Errorf("mailer: send failed: %w", err)
+		return fmt.Errorf("%w: %v", ErrDialAndSend, err)
 	}
 
-	return nil
-}
-
-func (c *Client) Verify(ctx context.Context) error {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-
-	if err := c.client.DialWithContext(ctx); err != nil {
-		return fmt.Errorf("mailer: dial/auth failed: %w", err)
-	}
-	defer func() {
-		_ = c.client.Close()
-	}()
 	return nil
 }
