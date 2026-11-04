@@ -21,7 +21,9 @@
 │   ├── cmd
 │   │   ├── api
 │   │   │   └── main.go
-│   │   └── geoipupdate
+│   │   ├── geoipupdate
+│   │   │   └── main.go
+│   │   └── worker
 │   │       └── main.go
 │   ├── data
 │   │   └── geoip
@@ -42,7 +44,8 @@
 │       │   ├── logger.go
 │       │   └── logger_test.go
 │       ├── mailer
-│       │   └── mailer.go
+│       │   ├── mailer.go
+│       │   └── mailer_test.go
 │       ├── middleware
 │       │   ├── httplogger.go
 │       │   ├── httplogger_test.go
@@ -60,9 +63,7 @@
 │       │   │   ├── handler.go
 │       │   │   ├── handler_test.go
 │       │   │   ├── module.go
-│       │   │   ├── module_test.go
 │       │   │   ├── ratelimiter.go
-│       │   │   ├── ratelimiter_test.go
 │       │   │   ├── repository.go
 │       │   │   ├── repository_test.go
 │       │   │   ├── route.go
@@ -73,9 +74,7 @@
 │       │   │   ├── handler.go
 │       │   │   ├── handler_test.go
 │       │   │   ├── module.go
-│       │   │   ├── module_test.go
 │       │   │   ├── ratelimiter.go
-│       │   │   ├── ratelimiter_test.go
 │       │   │   ├── repository.go
 │       │   │   ├── repository_test.go
 │       │   │   ├── route.go
@@ -89,9 +88,13 @@
 │       │       ├── repository.go
 │       │       ├── route.go
 │       │       └── service.go
-│       └── response
-│           ├── response.go
-│           └── response_test.go
+│       ├── response
+│       │   ├── response.go
+│       │   └── response_test.go
+│       ├── tasks
+│       │   └── email.go
+│       └── workers
+│           └── email.go
 └── skills-lock.json
 
-22 directories, 73 files
+25 directories, 73 files
