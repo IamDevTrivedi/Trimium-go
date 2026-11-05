@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/hibiken/asynq"
+	"server/internal/queue"
 )
 
 const pingTimeout = 2 * time.Second
@@ -21,10 +21,10 @@ type Service interface {
 
 type service struct {
 	repo  Repository
-	queue *asynq.Client
+	queue queue.Queue
 }
 
-func NewService(repo Repository, queue *asynq.Client) Service {
+func NewService(repo Repository, queue queue.Queue) Service {
 	return &service{
 		repo:  repo,
 		queue: queue,

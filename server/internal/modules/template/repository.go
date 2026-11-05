@@ -1,4 +1,4 @@
-package auth
+package template
 
 import "server/internal/database"
 
