@@ -88,6 +88,9 @@
 │       │       ├── repository.go
 │       │       ├── route.go
 │       │       └── service.go
+│       ├── queue
+│       │   ├── queue.go
+│       │   └── queue_test.go
 │       ├── response
 │       │   ├── response.go
 │       │   └── response_test.go
@@ -97,4 +100,4 @@
 │           └── email.go
 └── skills-lock.json
 
-25 directories, 73 files
+26 directories, 75 files
