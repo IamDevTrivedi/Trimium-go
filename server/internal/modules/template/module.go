@@ -1,13 +1,13 @@
-package auth
+package template
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/hibiken/asynq"
 
 	"server/internal/database"
+	"server/internal/queue"
 )
 
-func Register(router gin.IRouter, redis *database.Redis, mongo *database.Mongo, queue *asynq.Client) {
+func Register(router gin.IRouter, redis *database.Redis, mongo *database.Mongo, queue queue.Queue) {
 	repo := NewRepository(redis, mongo)
 	svc := NewService(repo, queue)
 	h := NewHandler(svc)

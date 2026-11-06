@@ -12,10 +12,6 @@ import (
 	"server/internal/workers"
 )
 
-const (
-	asynqConcurrency = 10
-)
-
 func main() {
 	cfg, err := config.Get()
 
@@ -51,7 +47,7 @@ func main() {
 			WriteTimeout: cfg.RedisWriteTimeout,
 			PoolSize:     cfg.RedisPoolSize,
 		},
-		asynq.Config{Concurrency: asynqConcurrency},
+		asynq.Config{Concurrency: cfg.AsynqConcurrency},
 	)
 
 	mux := asynq.NewServeMux()

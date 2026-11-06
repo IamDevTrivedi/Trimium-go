@@ -19,7 +19,7 @@ import (
 	"server/internal/middleware"
 	"server/internal/modules/health"
 	"server/internal/modules/root"
-	"server/internal/tasks"
+	"server/internal/queue"
 )
 
 const (
@@ -100,7 +100,9 @@ func run() error {
 
 	log.Info("Redis connection established")
 
-	queue := asynq.NewClient(asynq.RedisClientOpt{
+	// task queue: the raw asynq client stays a compositional-root detail;
+	// modules receive it only behind the producer-facing queue.Queue wall
+	queueClient := asynq.NewClient(asynq.RedisClientOpt{
 		Addr:         fmt.Sprintf("%s:%d", cfg.RedisHost, cfg.RedisPort),
 		Username:     cfg.RedisUsername,
 		Password:     cfg.RedisPassword,
@@ -110,29 +112,15 @@ func run() error {
 		WriteTimeout: cfg.RedisWriteTimeout,
 		PoolSize:     cfg.RedisPoolSize,
 	})
-	defer queue.Close()
-
-	for range 500 {
-		payload := &tasks.EmailPayload{
-			FromEmail: "hello@example.com",
-			ToEmail:   []string{"user1@example.com", "user2@example.com"},
-			Subject:   "Welcome to our service",
-			HTMLBody:  "<h1>Welcome!</h1><p>Thank you for joining our service.</p>",
+	defer func() {
+		if err := queueClient.Close(); err != nil {
+			log.Error(fmt.Sprintf("failed to close queue client: %v", err))
 		}
+	}()
 
-		task, err := tasks.NewEmailTask(payload)
-		if err != nil {
-			log.Error(fmt.Sprintf("could not create email task: %v", err))
-			continue
-		}
+	log.Info("Queue client ready")
 
-		if _, err := queue.Enqueue(task); err != nil {
-			log.Error(fmt.Sprintf("could not enqueue email task: %v", err))
-			continue
-		}
-
-		fmt.Println("aaaaaa")
-	}
+	taskQueue := queue.New(queueClient)
 
 	// setting the gin mode based on the environment
 	if cfg.AppEnv == "production" {
@@ -172,8 +160,8 @@ func run() error {
 	)
 
 	// registering routes
-	root.Register(router, redisStore, mongoStore, queue)
-	health.Register(router, redisStore, mongoStore, queue)
+	root.Register(router, redisStore, mongoStore, taskQueue)
+	health.Register(router, redisStore, mongoStore, taskQueue)
 
 	// starting the HTTP server
 	srv := &http.Server{

@@ -26,7 +26,6 @@ func (w *EmailWorker) HandleEmailSend(ctx context.Context, t *asynq.Task) error 
 	}
 
 	log := logger.Get()
-	log.Info("Sending email", "to", payload.ToEmail, "subject", payload.Subject)
 
 	if err := w.mailer.Send(ctx, payload.FromEmail, payload.ToEmail, payload.Subject, payload.HTMLBody); err != nil {
 		return fmt.Errorf("send email to %v: %w", payload.ToEmail, err)

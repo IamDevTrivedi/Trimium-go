@@ -1,8 +1,6 @@
-package auth
+package template
 
-import (
-	"server/internal/database"
-)
+import "server/internal/database"
 
 type RateLimiter interface {
 }

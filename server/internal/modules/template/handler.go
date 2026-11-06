@@ -1,4 +1,4 @@
-package auth
+package template
 
 type Handler interface {
 }
