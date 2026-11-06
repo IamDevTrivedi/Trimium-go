@@ -13,7 +13,6 @@ import (
 	"server/internal/tasks"
 )
 
-// Compile-time assertion: the asynq implementation satisfies the wall.
 var _ Queue = (*asynqQueue)(nil)
 
 func TestQueue_SendEmail_EnqueuesEmailTask(t *testing.T) {
