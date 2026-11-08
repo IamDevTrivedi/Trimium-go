@@ -131,7 +131,7 @@ func run() error {
 
 	// registering middlewares
 	geo, err := middleware.NewGeoResolver(middleware.GeoResolverConfig{
-		DBPath: "./data/geoip/GeoLite2-City.mmdb",
+		DBPath: cfg.GeoIPDBPath,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to initialize GeoResolver: %w", err)
