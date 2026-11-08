@@ -41,7 +41,7 @@ func TestRegisterRoutes_WiresMiddlewareAndHandler(t *testing.T) {
 	rl := &recordingRateLimiter{}
 	h := &recordingHandler{}
 	router := gin.New()
-	RegisterRoutes(router, rl, h)
+	RegisterRoutes(router, rl.Index, rl.WelcomeEmail, h)
 
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1", nil))
@@ -61,7 +61,7 @@ func TestRegisterRoutes_WiresWelcomeEmailRoute(t *testing.T) {
 	rl := &recordingRateLimiter{}
 	h := &recordingHandler{}
 	router := gin.New()
-	RegisterRoutes(router, rl, h)
+	RegisterRoutes(router, rl.Index, rl.WelcomeEmail, h)
 
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, httptest.NewRequestWithContext(
@@ -81,7 +81,7 @@ func TestRegisterRoutes_WiresWelcomeEmailRoute(t *testing.T) {
 
 func TestRegisterRoutes_RegistersAllRoutes(t *testing.T) {
 	router := gin.New()
-	RegisterRoutes(router, &recordingRateLimiter{}, &recordingHandler{})
+	RegisterRoutes(router, (&recordingRateLimiter{}).Index, (&recordingRateLimiter{}).WelcomeEmail, &recordingHandler{})
 
 	routes := router.Routes()
 	if len(routes) != 2 {

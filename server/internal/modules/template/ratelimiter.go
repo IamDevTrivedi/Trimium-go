@@ -1,13 +1,27 @@
 package template
 
-import "server/internal/database"
+import (
+	"time"
 
-type RateLimiter interface {
-}
+	"server/internal/database"
+	"server/internal/middleware"
 
-type rateLimiter struct {
-}
+	"github.com/gin-gonic/gin"
+)
 
-func NewRateLimiter(_ *database.Redis) RateLimiter {
-	return &rateLimiter{}
+const (
+	indexRateLimitPerMinute = 50
+)
+
+func NewRateLimiter(store *database.Redis) (indexRL gin.HandlerFunc) {
+	indexRL = middleware.RateLimiter(middleware.RateLimiterConfig{
+		Client: store.Client(),
+		Limit:  indexRateLimitPerMinute,
+		Window: 1 * time.Minute,
+		KeyGen: func(c *gin.Context) string {
+			return "template:index:" + middleware.GetRequestIP(c)
+		},
+	})
+
+	return indexRL
 }

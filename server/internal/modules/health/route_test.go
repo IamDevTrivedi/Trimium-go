@@ -62,7 +62,12 @@ func TestRegisterRoutes_WiresMiddlewareAndHandlers(t *testing.T) {
 			rl := &recordingRateLimiter{}
 			h := &recordingHandler{}
 			router := gin.New()
-			RegisterRoutes(router, rl, h)
+			RegisterRoutes(router,
+				func(c *gin.Context) { rl.Index(c) },
+				func(c *gin.Context) { rl.Redis(c) },
+				func(c *gin.Context) { rl.Mongo(c) },
+				h,
+			)
 
 			w := httptest.NewRecorder()
 			router.ServeHTTP(w, httptest.NewRequestWithContext(t.Context(), http.MethodGet, tt.path, nil))
@@ -82,7 +87,12 @@ func TestRegisterRoutes_WiresMiddlewareAndHandlers(t *testing.T) {
 
 func TestRegisterRoutes_RegistersExpectedRoutes(t *testing.T) {
 	router := gin.New()
-	RegisterRoutes(router, &recordingRateLimiter{}, &recordingHandler{})
+	RegisterRoutes(router,
+		func(_ *gin.Context) { /* no-op */ },
+		func(_ *gin.Context) { /* no-op */ },
+		func(_ *gin.Context) { /* no-op */ },
+		&recordingHandler{},
+	)
 
 	want := map[string]string{
 		"/api/v1/healthz":       http.MethodGet,

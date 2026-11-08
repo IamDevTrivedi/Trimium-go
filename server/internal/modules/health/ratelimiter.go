@@ -9,49 +9,39 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type RateLimiter interface {
-	Index(c *gin.Context)
-	Redis(c *gin.Context)
-	Mongo(c *gin.Context)
+const (
+	indexRatePerMinute = 5
+	redisRatePerMinute = 10
+	mongoRatePerMinute = 15
+)
+
+func NewRateLimiters(store *database.Redis) (indexRL, redisRL, mongoRL gin.HandlerFunc) {
+	indexRL = middleware.RateLimiter(middleware.RateLimiterConfig{
+		Client: store.Client(),
+		Limit:  indexRatePerMinute,
+		Window: 1 * time.Minute,
+		KeyGen: func(c *gin.Context) string {
+			return "health:index:" + middleware.GetRequestIP(c)
+		},
+	})
+
+	redisRL = middleware.RateLimiter(middleware.RateLimiterConfig{
+		Client: store.Client(),
+		Limit:  redisRatePerMinute,
+		Window: 1 * time.Minute,
+		KeyGen: func(c *gin.Context) string {
+			return "health:redis:" + middleware.GetRequestIP(c)
+		},
+	})
+
+	mongoRL = middleware.RateLimiter(middleware.RateLimiterConfig{
+		Client: store.Client(),
+		Limit:  mongoRatePerMinute,
+		Window: 1 * time.Minute,
+		KeyGen: func(c *gin.Context) string {
+			return "health:mongo:" + middleware.GetRequestIP(c)
+		},
+	})
+
+	return indexRL, redisRL, mongoRL
 }
-
-type rateLimiter struct {
-	index gin.HandlerFunc
-	redis gin.HandlerFunc
-	mongo gin.HandlerFunc
-}
-
-func NewRateLimiter(store *database.Redis) RateLimiter {
-	return &rateLimiter{
-		index: middleware.RateLimiter(middleware.RateLimiterConfig{
-			Client: store.Client(),
-			Limit:  5,
-			Window: 1 * time.Minute,
-			KeyGen: func(c *gin.Context) string {
-				return "health:index:" + middleware.GetRequestIP(c)
-			},
-		}),
-
-		redis: middleware.RateLimiter(middleware.RateLimiterConfig{
-			Client: store.Client(),
-			Limit:  10,
-			Window: 1 * time.Minute,
-			KeyGen: func(c *gin.Context) string {
-				return "health:redis:" + middleware.GetRequestIP(c)
-			},
-		}),
-
-		mongo: middleware.RateLimiter(middleware.RateLimiterConfig{
-			Client: store.Client(),
-			Limit:  15,
-			Window: 1 * time.Minute,
-			KeyGen: func(c *gin.Context) string {
-				return "health:mongo:" + middleware.GetRequestIP(c)
-			},
-		}),
-	}
-}
-
-func (r *rateLimiter) Index(c *gin.Context) { r.index(c) }
-func (r *rateLimiter) Redis(c *gin.Context) { r.redis(c) }
-func (r *rateLimiter) Mongo(c *gin.Context) { r.mongo(c) }

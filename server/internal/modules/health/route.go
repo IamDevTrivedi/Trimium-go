@@ -2,8 +2,8 @@ package health
 
 import "github.com/gin-gonic/gin"
 
-func RegisterRoutes(router gin.IRouter, rl RateLimiter, h Handler) {
-	router.GET("/api/v1/healthz", rl.Index, h.HandleHealth)
-	router.GET("/api/v1/healthz/redis", rl.Redis, h.HandleRedisHealth)
-	router.GET("/api/v1/healthz/mongo", rl.Mongo, h.HandleMongoHealth)
+func RegisterRoutes(router gin.IRouter, indexRL, redisRL, mongoRL gin.HandlerFunc, h Handler) {
+	router.GET("/api/v1/healthz", indexRL, h.HandleHealth)
+	router.GET("/api/v1/healthz/redis", redisRL, h.HandleRedisHealth)
+	router.GET("/api/v1/healthz/mongo", mongoRL, h.HandleMongoHealth)
 }
