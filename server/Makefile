@@ -1,154 +1,94 @@
-# Global settings
-SHELL       := /bin/bash
-.SHELLFLAGS := -eu -o pipefail -c
-
+.SHELLFLAGS   := -eu -o pipefail -c
 .DEFAULT_GOAL := help
 
-# Project variables
-APP_NAME  := api
-BIN_DIR   := bin
-BIN       := $(BIN_DIR)/$(APP_NAME)
-CMD_PATH  := ./cmd/api
-GEOIP_CMD := ./cmd/geoipupdate
-GEOIP_DB  ?= ./data/geoip/GeoLite2-City.mmdb
+DEV_ENV  ?= development
+PROD_ENV ?= production
 
-# Runtime environments
-DEV_ENV   ?= development
-PROD_ENV  ?= production
+GEOIP_DB ?= ./data/geoip/GeoLite2-City.mmdb
 
-# Docker variables
-COMPOSE_FILE := docker-compose.dev.yml
-
-# Tool variables
 GOLANGCI_LINT_VERSION ?= v2.14.0
 GOVULNCHECK_VERSION   ?= v1.9.0
-GOLANGCI_LINT         := golangci-lint
-GOVULNCHECK           := govulncheck
-AIR                   := air
-GOFMT                 := gofmt
-GO                    := go
+AIR_VERSION           ?= v1.67.4
 
-# Phony targets
-.PHONY: help setup clean \
-        build build-check run run-build dev \
-        test vet govulncheck \
-        fmt fmt-check \
-        lint lint-check \
-        tidy tidy-check \
-        ci check \
-        up down \
-        install-lint install-air install-govulncheck \
-		geoip-update geoip-check
+COMPOSE_FILE := docker-compose.dev.yml
 
-# Help
-help: ## Show available targets
-	@printf "Usage:\n  make <target>\n\nTargets:\n"
-	@awk 'BEGIN {FS = ":.*##"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
+.PHONY: help tools build dev run-worker test fmt lint lint-check govulncheck \
+	    tidy tidy-check ci check up down geoip-update geoip-check
 
-# Setup & tooling
-setup: install-lint install-air install-govulncheck ## Install all development tooling
+help:
+	@echo "Usage: make <target>"
+	@echo ""
+	@echo "Targets:"
+	@echo "  help          Show available targets"
+	@echo "  tools         Install pinned dev tooling (golangci-lint, govulncheck, air)"
+	@echo "  build         Compile all packages"
+	@echo "  dev           Run the API with live reload (air)"
+	@echo "  run-worker    Run the worker in development mode"
+	@echo "  test          Run tests with race detector and coverage"
+	@echo "  fmt           Format Go source files"
+	@echo "  lint          Run golangci-lint with automatic fixes"
+	@echo "  lint-check    Run golangci-lint without fixes"
+	@echo "  govulncheck   Scan for known vulnerabilities"
+	@echo "  tidy          Tidy go.mod and go.sum"
+	@echo "  tidy-check    Fail if go.mod or go.sum need tidying"
+	@echo "  ci            Run all CI checks (stops at first failure)"
+	@echo "  check         Alias for ci"
+	@echo "  up            Start the docker compose development stack"
+	@echo "  down          Stop the docker compose development stack"
+	@echo "  geoip-update  Download GeoLite2 database (needs MAXMIND_LICENSE_KEY)"
+	@echo "  geoip-check   Fail if the GeoIP database is missing"
+	@echo ""
 
-install-lint: ## Install golangci-lint (version set by GOLANGCI_LINT_VERSION)
-	$(GO) install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
+tools:
+	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
+	go install golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION)
+	go install github.com/air-verse/air@$(AIR_VERSION)
 
-install-air: ## Install air for live reloading
-	$(GO) install github.com/air-verse/air@latest
+build:
+	go build ./...
 
-install-govulncheck: ## Install govulncheck (version set by GOVULNCHECK_VERSION)
-	$(GO) install golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION)
+dev:
+	air
 
-# Build & run
-build: ## Compile the binary into ./bin
-	@mkdir -p $(BIN_DIR)
-	$(GO) build -o $(BIN) $(CMD_PATH)
+run-worker:
+	APP_ENV=$(DEV_ENV) go run ./cmd/worker
 
-build-check: ## Verify that all packages and commands compile
-	$(GO) build ./...
+test:
+	go test ./... -race -cover
 
-run: ## Run the app in development mode
-	APP_ENV=$(DEV_ENV) $(GO) run $(CMD_PATH)
+fmt:
+	gofmt -w .
 
-run-build: build ## Build, then run the compiled binary in production mode
-	APP_ENV=$(PROD_ENV) $(BIN)
+lint:
+	golangci-lint run --fix
 
-dev: ## Start the app with live reload (air)
-	$(AIR)
+lint-check:
+	golangci-lint run
+	golangci-lint fmt --diff
 
-clean: ## Remove build artifacts
-	rm -rf $(BIN_DIR)
+govulncheck:
+	govulncheck ./...
 
-# Test
-test: ## Run all tests with race detector and coverage
-	$(GO) test ./... -race -cover
+tidy:
+	go mod tidy
 
-vet: ## Run go vet on all packages
-	$(GO) vet ./...
+tidy-check:
+	go mod tidy -diff
 
-govulncheck: ## Scan code, dependencies and toolchain for known vulnerabilities
-	$(GOVULNCHECK) ./...
+ci: tidy-check lint-check govulncheck test build
+	@echo "All CI checks passed successfully!"
 
-# Formatting
-fmt: ## Format Go source files in-place
-	$(GOFMT) -w .
+check: ci
 
-fmt-check: ## Fail if any Go files are not formatted
-	@unformatted=$$($(GOFMT) -l .); \
-	if [ -n "$$unformatted" ]; then \
-		echo "Unformatted files:"; \
-		echo "$$unformatted"; \
-		exit 1; \
-	fi
-
-# Linting
-lint: ## Run golangci-lint with automatic fixes
-	$(GOLANGCI_LINT) run --fix
-
-lint-check: ## Run golangci-lint without applying fixes
-	$(GOLANGCI_LINT) run
-	$(GOLANGCI_LINT) fmt --diff
-
-# Modules
-tidy: ## Download and clean up go.mod and go.sum
-	$(GO) mod tidy
-
-tidy-check: ## Verify module files and fail if go.mod/go.sum need tidying
-	$(GO) mod download
-	$(GO) mod verify
-	$(GO) mod tidy -diff
-
-# All CI checks
-ci: ## Run all CI checks silently and report final result (mod, fmt, lint, vet, vuln, race test, build)
-	@tmp=$$(mktemp); \
-	trap 'rm -f "$$tmp"' EXIT; \
-	run_step() { \
-		if ! "$$@" > "$$tmp" 2>&1; then \
-			echo "[FAILED] $$*"; \
-			cat "$$tmp"; \
-			exit 1; \
-		fi; \
-	}; \
-	run_step make tidy-check; \
-	run_step make fmt-check; \
-	run_step make lint-check; \
-	run_step make vet; \
-	run_step make govulncheck; \
-	run_step make test; \
-	run_step make build-check; \
-	echo "All CI checks passed successfully!"
-
-check: ci ## Alias for make ci
-
-# Docker
-up: ## Start docker-compose development stack (detached)
+up:
 	docker compose -f $(COMPOSE_FILE) up -d
 
-down: ## Stop docker-compose development stack
+down:
 	docker compose -f $(COMPOSE_FILE) down
 
-# GeoIP
-geoip-update: ## Download/refresh the GeoLite2-City database (needs MAXMIND_LICENSE_KEY)
+geoip-update:
 	@test -n "$${MAXMIND_LICENSE_KEY:-}" || { echo "MAXMIND_LICENSE_KEY is not set"; exit 1; }
-	GEOIP_DB_PATH=$(GEOIP_DB) $(GO) run $(GEOIP_CMD)
+	GEOIP_DB_PATH=$(GEOIP_DB) go run ./cmd/geoipupdate
 
-geoip-check: ## Fail if the GeoIP database is missing
+geoip-check:
 	@test -f $(GEOIP_DB) || { echo "Missing $(GEOIP_DB). Run: make geoip-update"; exit 1; }
