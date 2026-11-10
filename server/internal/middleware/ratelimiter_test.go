@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -53,6 +54,16 @@ func requireRateLimitStatus(t *testing.T, w *httptest.ResponseRecorder, want int
 
 	if w.Code != want {
 		t.Fatalf("expected status %d, got %d: %s", want, w.Code, w.Body.String())
+	}
+}
+
+func requireRateLimitHeaders(t *testing.T, w *httptest.ResponseRecorder, want map[string]string) {
+	t.Helper()
+
+	for name, expected := range want {
+		if got := w.Header().Get(name); got != expected {
+			t.Errorf("expected header %s=%q, got %q", name, expected, got)
+		}
 	}
 }
 
@@ -174,6 +185,58 @@ func TestRateLimiter_SlidingWindow(t *testing.T) {
 	requireRateLimitStatus(t, serveRateLimitRequest(t, router, "/test", nil), http.StatusNoContent)
 	requireRateLimitStatus(t, serveRateLimitRequest(t, router, "/test", nil), http.StatusNoContent)
 	requireRateLimitStatus(t, serveRateLimitRequest(t, router, "/test", nil), http.StatusTooManyRequests)
+}
+
+func TestRateLimiter_SetsStandardHeaders(t *testing.T) {
+	client, mr := newRateLimiterRedis(t)
+	base := time.Unix(1_700_000_000, 0).UTC()
+	mr.SetTime(base)
+
+	router := gin.New()
+	router.Use(
+		RequestID(),
+		RateLimiter(RateLimiterConfig{
+			Client: client,
+			Limit:  2,
+			Window: time.Minute,
+			KeyGen: func(*gin.Context) string {
+				return "client-a"
+			},
+		}),
+	)
+	router.GET("/test", func(c *gin.Context) {
+		c.Status(http.StatusNoContent)
+	})
+
+	reset := strconv.FormatInt(base.Add(time.Minute).Unix(), 10)
+
+	w := serveRateLimitRequest(t, router, "/test", nil)
+	requireRateLimitStatus(t, w, http.StatusNoContent)
+	requireRateLimitHeaders(t, w, map[string]string{
+		"X-RateLimit-Limit":     "2",
+		"X-RateLimit-Remaining": "1",
+		"X-RateLimit-Reset":     reset,
+	})
+	if got := w.Header().Get("Retry-After"); got != "" {
+		t.Errorf("expected no Retry-After on an allowed request, got %q", got)
+	}
+
+	w = serveRateLimitRequest(t, router, "/test", nil)
+	requireRateLimitStatus(t, w, http.StatusNoContent)
+	requireRateLimitHeaders(t, w, map[string]string{
+		"X-RateLimit-Limit":     "2",
+		"X-RateLimit-Remaining": "0",
+		"X-RateLimit-Reset":     reset,
+	})
+
+	w = serveRateLimitRequest(t, router, "/test", nil)
+	requireRateLimitStatus(t, w, http.StatusTooManyRequests)
+	requireRateLimitHeaders(t, w, map[string]string{
+		"X-RateLimit-Limit":     "2",
+		"X-RateLimit-Remaining": "0",
+		"X-RateLimit-Reset":     reset,
+		"Retry-After":           "60",
+	})
 }
 
 func TestRateLimiter_IsolatesKeys(t *testing.T) {
@@ -343,7 +406,11 @@ func TestRateLimiter_AllowsRequestWhenRedisFails(t *testing.T) {
 		c.Status(http.StatusNoContent)
 	})
 
-	requireRateLimitStatus(t, serveRateLimitRequest(t, router, "/test", nil), http.StatusNoContent)
+	w := serveRateLimitRequest(t, router, "/test", nil)
+	requireRateLimitStatus(t, w, http.StatusNoContent)
+	if got := w.Header().Get("X-RateLimit-Limit"); got != "" {
+		t.Errorf("expected no rate limit headers when Redis is unavailable, got %q", got)
+	}
 }
 
 func TestRateLimiter_PanicsOnInvalidConfig(t *testing.T) {

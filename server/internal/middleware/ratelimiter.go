@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -13,9 +14,6 @@ import (
 
 const rateLimitKeyPrefix = "rl"
 
-// KeyGen derives the rate-limit key for a request. The returned string
-// identifies the bucket the request belongs to, such as a client IP, an API
-// key, or a user ID.
 type KeyGen func(c *gin.Context) string
 
 type RateLimiterConfig struct {
@@ -29,9 +27,6 @@ func rateLimitRedisKey(key string) string {
 	return rateLimitKeyPrefix + ":" + key
 }
 
-// slidingWindowScript atomically trims expired entries, counts the current
-// window, and records the request. It uses Redis server time so every
-// instance evaluates the same window.
 var slidingWindowScript = redis.NewScript(`
 local key = KEYS[1]
 local windowMillis = tonumber(ARGV[1])
@@ -44,34 +39,36 @@ local nowMillis = tonumber(redisTime[1]) * 1000 + math.floor(tonumber(redisTime[
 redis.call("ZREMRANGEBYSCORE", key, "-inf", nowMillis - windowMillis)
 
 local count = redis.call("ZCARD", key)
-if count >= limit then
-	return 0
+local allowed = 0
+if count < limit then
+        redis.call("ZADD", key, nowMillis, member)
+        redis.call("PEXPIRE", key, windowMillis)
+        count = count + 1
+        allowed = 1
 end
 
-redis.call("ZADD", key, nowMillis, member)
-redis.call("PEXPIRE", key, windowMillis)
+local remaining = limit - count
+if remaining < 0 then
+        remaining = 0
+end
 
-return 1
+local resetMillis = nowMillis + windowMillis
+local oldest = redis.call("ZRANGE", key, 0, 0, "WITHSCORES")
+if #oldest > 0 then
+        resetMillis = tonumber(oldest[2]) + windowMillis
+end
+
+local retryAfter = 0
+if allowed == 0 then
+        retryAfter = math.ceil((resetMillis - nowMillis) / 1000)
+        if retryAfter < 1 then
+                retryAfter = 1
+        end
+end
+
+return {allowed, remaining, math.floor(resetMillis / 1000), retryAfter}
 `)
 
-// RateLimiter returns a Gin middleware that enforces a sliding-window log
-// rate limit backed by Redis. Register it globally with router.Use, per group
-// with group.Use, or per route by passing it before the route handler:
-//
-//	router.Use(middleware.RateLimiter(middleware.RateLimiterConfig{
-//		Client: redisClient,
-//		Limit:  100,
-//		Window: time.Minute,
-//		KeyGen: func(c *gin.Context) string {
-//			return c.ClientIP()
-//		},
-//	}))
-//
-// Window is the length of the rate-limit window. The limit is enforced per
-// distinct key returned by KeyGen.
-//
-// If Redis is unavailable, the request is allowed and the error is logged so
-// the API stays available; enforcement resumes when Redis recovers.
 func RateLimiter(config RateLimiterConfig) gin.HandlerFunc {
 	if config.Client == nil {
 		panic("middleware: RateLimiter requires a Redis client")
@@ -92,14 +89,14 @@ func RateLimiter(config RateLimiterConfig) gin.HandlerFunc {
 		key := config.KeyGen(c)
 		member := GetRequestID(c)
 
-		allowed, err := slidingWindowScript.Run(
+		res, err := slidingWindowScript.Run(
 			c.Request.Context(),
 			config.Client,
 			[]string{rateLimitRedisKey(key)},
 			windowMillis,
 			config.Limit,
 			member,
-		).Int64()
+		).Slice()
 		if err != nil {
 			log := logger.Get()
 			log.Error("rate limiter: redis unavailable", "error", err)
@@ -107,7 +104,17 @@ func RateLimiter(config RateLimiterConfig) gin.HandlerFunc {
 			return
 		}
 
+		allowed := res[0].(int64)
+		remaining := res[1].(int64)
+		reset := res[2].(int64)
+		retryAfter := res[3].(int64)
+
+		c.Header("X-RateLimit-Limit", strconv.Itoa(config.Limit))
+		c.Header("X-RateLimit-Remaining", strconv.FormatInt(remaining, 10))
+		c.Header("X-RateLimit-Reset", strconv.FormatInt(reset, 10))
+
 		if allowed == 0 {
+			c.Header("Retry-After", strconv.FormatInt(retryAfter, 10))
 			c.Abort()
 			response.Error(c, http.StatusTooManyRequests, "Rate limit exceeded")
 			return
