@@ -35,11 +35,16 @@
 │       ├── config
 │       │   ├── config.go
 │       │   └── config_test.go
+│       ├── crypto
+│       │   ├── argon2.go
+│       │   └── otp.go
 │       ├── database
 │       │   ├── mongo.go
 │       │   ├── mongo_test.go
 │       │   ├── redis.go
 │       │   └── redis_test.go
+│       ├── emailtemplates
+│       │   └── signup.go
 │       ├── logger
 │       │   ├── logger.go
 │       │   └── logger_test.go
@@ -52,6 +57,7 @@
 │       │   ├── ip.go
 │       │   ├── ip_test.go
 │       │   ├── location.go
+│       │   ├── location_test.go
 │       │   ├── ratelimiter.go
 │       │   ├── ratelimiter_test.go
 │       │   ├── requestid.go
@@ -59,6 +65,13 @@
 │       │   ├── useragent.go
 │       │   └── useragent_test.go
 │       ├── modules
+│       │   ├── auth
+│       │   │   ├── handler.go
+│       │   │   ├── module.go
+│       │   │   ├── ratelimiter.go
+│       │   │   ├── repository.go
+│       │   │   ├── route.go
+│       │   │   └── service.go
 │       │   ├── health
 │       │   │   ├── handler.go
 │       │   │   ├── handler_test.go
@@ -72,15 +85,12 @@
 │       │   │   └── service_test.go
 │       │   ├── root
 │       │   │   ├── handler.go
-│       │   │   ├── handler_test.go
 │       │   │   ├── module.go
 │       │   │   ├── ratelimiter.go
 │       │   │   ├── repository.go
 │       │   │   ├── repository_test.go
 │       │   │   ├── route.go
-│       │   │   ├── route_test.go
-│       │   │   ├── service.go
-│       │   │   └── service_test.go
+│       │   │   └── service.go
 │       │   └── template
 │       │       ├── handler.go
 │       │       ├── module.go
@@ -89,8 +99,7 @@
 │       │       ├── route.go
 │       │       └── service.go
 │       ├── queue
-│       │   ├── queue.go
-│       │   └── queue_test.go
+│       │   └── queue.go
 │       ├── response
 │       │   ├── response.go
 │       │   └── response_test.go
@@ -100,4 +109,4 @@
 │           └── email.go
 └── skills-lock.json
 
-26 directories, 75 files
+29 directories, 81 files
