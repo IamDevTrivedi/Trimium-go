@@ -14,7 +14,7 @@ const (
 	welcomeEmailPerMinute = 5
 )
 
-func NewRateLimiters(store *database.Redis) (indexRL, welcomeEmailRL gin.HandlerFunc) {
+func NewRateLimiters(store *database.Redis) (indexRL gin.HandlerFunc) {
 	indexRL = middleware.RateLimiter(middleware.RateLimiterConfig{
 		Client: store.Client(),
 		Limit:  rateLimitPerMinute,
@@ -24,14 +24,5 @@ func NewRateLimiters(store *database.Redis) (indexRL, welcomeEmailRL gin.Handler
 		},
 	})
 
-	welcomeEmailRL = middleware.RateLimiter(middleware.RateLimiterConfig{
-		Client: store.Client(),
-		Limit:  welcomeEmailPerMinute,
-		Window: 1 * time.Minute,
-		KeyGen: func(c *gin.Context) string {
-			return "root:welcome_email:" + middleware.GetRequestIP(c)
-		},
-	})
-
-	return indexRL, welcomeEmailRL
+	return indexRL
 }

@@ -34,7 +34,7 @@ func main() {
 		return
 	}
 
-	emailWorker := workers.NewEmailWorker(mailClient)
+	emailWorker := workers.NewEmailWorker(cfg.FromEmail, mailClient)
 
 	server := asynq.NewServer(
 		asynq.RedisClientOpt{

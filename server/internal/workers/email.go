@@ -12,11 +12,15 @@ import (
 )
 
 type EmailWorker struct {
-	mailer *mailer.Client
+	mailer    *mailer.Client
+	fromEmail string
 }
 
-func NewEmailWorker(m *mailer.Client) *EmailWorker {
-	return &EmailWorker{mailer: m}
+func NewEmailWorker(fromEmail string, m *mailer.Client) *EmailWorker {
+	return &EmailWorker{
+		mailer:    m,
+		fromEmail: fromEmail,
+	}
 }
 
 func (w *EmailWorker) HandleEmailSend(ctx context.Context, t *asynq.Task) error {
@@ -27,7 +31,7 @@ func (w *EmailWorker) HandleEmailSend(ctx context.Context, t *asynq.Task) error 
 
 	log := logger.Get()
 
-	if err := w.mailer.Send(ctx, payload.FromEmail, payload.ToEmail, payload.Subject, payload.HTMLBody); err != nil {
+	if err := w.mailer.Send(ctx, w.fromEmail, payload.ToEmail, payload.Subject, payload.HTMLBody); err != nil {
 		return fmt.Errorf("send email to %v: %w", payload.ToEmail, err)
 	}
 

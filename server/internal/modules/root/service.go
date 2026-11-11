@@ -2,10 +2,8 @@ package root
 
 import (
 	"context"
-	"errors"
 
 	"server/internal/queue"
-	"server/internal/tasks"
 )
 
 const (
@@ -16,7 +14,6 @@ const (
 
 type Service interface {
 	GetAppInfo(ctx context.Context) (*AppInfo, error)
-	SendWelcomeEmail(ctx context.Context, to []string) error
 }
 
 type service struct {
@@ -43,17 +40,4 @@ func (s *service) GetAppInfo(_ context.Context) (*AppInfo, error) {
 		Version: "1.0.0",
 		Status:  "ok",
 	}, nil
-}
-
-func (s *service) SendWelcomeEmail(ctx context.Context, to []string) error {
-	if len(to) == 0 {
-		return errors.New("root: welcome email requires at least one recipient")
-	}
-
-	return s.queue.SendEmail(ctx, tasks.EmailPayload{
-		FromEmail: welcomeFromEmail,
-		ToEmail:   to,
-		Subject:   welcomeSubject,
-		HTMLBody:  welcomeHTMLBody,
-	})
 }

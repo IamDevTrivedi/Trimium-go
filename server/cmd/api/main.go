@@ -17,6 +17,7 @@ import (
 	"server/internal/database"
 	"server/internal/logger"
 	"server/internal/middleware"
+	"server/internal/modules/auth"
 	"server/internal/modules/health"
 	"server/internal/modules/root"
 	"server/internal/queue"
@@ -162,6 +163,7 @@ func run() error {
 	// registering routes
 	root.Register(router, redisStore, mongoStore, taskQueue)
 	health.Register(router, redisStore, mongoStore, taskQueue)
+	auth.Register(router, redisStore, mongoStore, taskQueue)
 
 	// starting the HTTP server
 	srv := &http.Server{

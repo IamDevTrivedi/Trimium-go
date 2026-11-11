@@ -9,10 +9,9 @@ import (
 const TypeEmailSend = "email:send"
 
 type EmailPayload struct {
-	FromEmail string
-	ToEmail   []string
-	Subject   string
-	HTMLBody  string
+	ToEmail  []string
+	Subject  string
+	HTMLBody string
 }
 
 func NewEmailTask(payload *EmailPayload) (*asynq.Task, error) {
