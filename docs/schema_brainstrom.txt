@@ -2,6 +2,7 @@ _id            ObjectId
 first_name     string   (non-empty)
 last_name      string   (non-empty)
 email          string   (lowercased, trimmed, regex-validated; UNIQUE index)
+username       string   (lowercased + "." + "_" + num)
 password_hash  string   (argon2id; salt and params embedded)
 created_at     int      (epoch ms)
 updated_at     int      (epoch ms)
