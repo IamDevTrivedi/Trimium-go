@@ -2,6 +2,8 @@ package auth
 
 import (
 	"context"
+	"crypto/subtle"
+	"errors"
 	"fmt"
 	"time"
 
@@ -11,15 +13,23 @@ import (
 	"server/internal/tasks"
 )
 
+var (
+	ErrOTPNotFound         = errors.New("otp not found or expired")
+	ErrInvalidOTP          = errors.New("invalid otp")
+	ErrMaxAttemptsExceeded = errors.New("max verification attempts exceeded")
+)
+
 const (
 	otpTTL               = 5 * time.Minute
 	otpLength            = 6
+	otpMaxAttempts       = 3
 	otpStatusVerified    = "VERIFIED"
 	otpStatusNotVerified = "NOT_VERIFIED"
 )
 
 type Service interface {
 	SignUpInit(email string) error
+	SignUpVerify(email, otp string) error
 }
 
 type service struct {
@@ -50,7 +60,7 @@ func (s *service) SignUpInit(email string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	if err := s.repo.StoreOTP(ctx, email, otpData, otpTTL); err != nil {
+	if err := s.repo.StoreSignUpOTP(ctx, email, otpData, otpTTL); err != nil {
 		return fmt.Errorf("failed to store otp: %w", err)
 	}
 
@@ -70,6 +80,43 @@ func (s *service) SignUpInit(email string) error {
 
 	if err := s.queue.SendEmail(ctx, payload); err != nil {
 		return fmt.Errorf("failed to enqueue email task: %w", err)
+	}
+
+	return nil
+}
+
+func (s *service) SignUpVerify(email, otp string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	otpData, err := s.repo.GetSignUpOTP(ctx, email)
+	if err != nil {
+		return err
+	}
+
+	if otpData.Status == otpStatusVerified {
+		return nil
+	}
+
+	if subtle.ConstantTimeCompare([]byte(otpData.OTP), []byte(otp)) != 1 {
+		otpData.Attempts++
+		if otpData.Attempts >= otpMaxAttempts {
+			if err := s.repo.DeleteSignUpOTP(ctx, email); err != nil {
+				return fmt.Errorf("failed to delete otp after max attempts: %w", err)
+			}
+			return ErrMaxAttemptsExceeded
+		}
+
+		if err := s.repo.StoreSignUpOTP(ctx, email, otpData, 0); err != nil {
+			return fmt.Errorf("failed to update otp attempts: %w", err)
+		}
+
+		return ErrInvalidOTP
+	}
+
+	otpData.Status = otpStatusVerified
+	if err := s.repo.StoreSignUpOTP(ctx, email, otpData, 0); err != nil {
+		return fmt.Errorf("failed to update otp status: %w", err)
 	}
 
 	return nil

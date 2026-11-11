@@ -10,11 +10,12 @@ import (
 )
 
 const (
-	signUpInitRateLimitPerMinute = 10
+	signUpInitRateLimitPerMinute   = 10
+	signUpVerifyRateLimitPerMinute = 10
 )
 
-func NewRateLimiter(store *database.Redis) gin.HandlerFunc {
-	return middleware.RateLimiter(middleware.RateLimiterConfig{
+func NewRateLimiters(store *database.Redis) (signUpInitRL, signUpVerifyRL gin.HandlerFunc) {
+	signUpInitRL = middleware.RateLimiter(middleware.RateLimiterConfig{
 		Client: store.Client(),
 		Limit:  signUpInitRateLimitPerMinute,
 		Window: 1 * time.Minute,
@@ -22,4 +23,15 @@ func NewRateLimiter(store *database.Redis) gin.HandlerFunc {
 			return "auth:signup:init:" + middleware.GetRequestIP(c)
 		},
 	})
+
+	signUpVerifyRL = middleware.RateLimiter(middleware.RateLimiterConfig{
+		Client: store.Client(),
+		Limit:  signUpVerifyRateLimitPerMinute,
+		Window: 1 * time.Minute,
+		KeyGen: func(c *gin.Context) string {
+			return "auth:signup:verify:" + middleware.GetRequestIP(c)
+		},
+	})
+
+	return signUpInitRL, signUpVerifyRL
 }
