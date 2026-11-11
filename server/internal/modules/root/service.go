@@ -6,12 +6,6 @@ import (
 	"server/internal/queue"
 )
 
-const (
-	welcomeFromEmail = "hello@example.com"
-	welcomeSubject   = "Welcome to Trimium!"
-	welcomeHTMLBody  = "<h1>Welcome!</h1><p>Thank you for joining Trimium.</p>"
-)
-
 type Service interface {
 	GetAppInfo(ctx context.Context) (*AppInfo, error)
 }

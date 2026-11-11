@@ -13,11 +13,11 @@ func GenerateOTP(length int) (string, error) {
 		return "", errors.New("otp length must be greater than zero")
 	}
 
-	max := big.NewInt(int64(len(otpCharset)))
+	limit := big.NewInt(int64(len(otpCharset)))
 	otp := make([]byte, length)
 
 	for i := range otp {
-		n, err := rand.Int(rand.Reader, max)
+		n, err := rand.Int(rand.Reader, limit)
 		if err != nil {
 			return "", err
 		}
