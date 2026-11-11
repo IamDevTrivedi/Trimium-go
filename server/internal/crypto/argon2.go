@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 
 	"golang.org/x/crypto/argon2"
@@ -76,7 +77,12 @@ func VerifyPassword(password, encodedHash string) (bool, error) {
 		return false, ErrInvalidHash
 	}
 
-	actual := argon2.IDKey([]byte(password), salt, time, memory, threads, uint32(len(expected)))
+	keyLen := len(expected)
+	if keyLen < 0 || keyLen > math.MaxUint32 {
+		return false, ErrInvalidHash
+	}
+
+	actual := argon2.IDKey([]byte(password), salt, time, memory, threads, uint32(keyLen))
 
 	return subtle.ConstantTimeCompare(expected, actual) == 1, nil
 }
