@@ -83,6 +83,28 @@ func TestNewMongo_InvalidURI(t *testing.T) {
 	}
 }
 
+func TestNewMongo_ZeroPingTimeoutUsesParentContext(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping in -short mode: dials an unreachable local port")
+	}
+
+	// PingTimeout == 0 means the caller's context is used directly (no
+	// sub-context with a deadline is created). The ping still fails because
+	// nothing listens on port 1 — we just verify the error format is the
+	// same and no panic occurs.
+	opts := unreachableMongoOptions()
+	opts.PingTimeout = 0
+
+	m, err := NewMongo(context.Background(), opts)
+	if err == nil {
+		_ = m.Close(context.Background())
+		t.Fatal("expected ping failure for unreachable server, got nil")
+	}
+	if !strings.Contains(err.Error(), "mongo: ping:") {
+		t.Fatalf("expected error containing %q, got %q", "mongo: ping:", err.Error())
+	}
+}
+
 func TestNewMongo_PingFailure(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping in -short mode: dials an unreachable local port")
@@ -126,6 +148,9 @@ func TestMongo_Accessors(t *testing.T) {
 	}
 	if m.Collection("users") == nil {
 		t.Error(`Collection("users") returned nil`)
+	}
+	if name := m.Collection("users").Name(); name != "users" {
+		t.Errorf(`Collection("users").Name() = %q, want "users"`, name)
 	}
 
 	// Nothing listens on port 1, so the ping must fail quickly.

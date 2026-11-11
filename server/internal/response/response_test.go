@@ -186,3 +186,23 @@ func TestError_SerializesNullMetadata(t *testing.T) {
 		t.Errorf("expected body to contain %q, got %s", `"metadata":null`, w.Body.String())
 	}
 }
+
+// TestSuccess_SerializesNullMetadata and TestCreated_SerializesNullMetadata
+// pin the wire format for the two success helpers. A refactor that serialised
+// nil metadata as absent (json omitempty) for success but kept null for errors
+// would break client contract — these tests would catch it.
+func TestSuccess_SerializesNullMetadata(t *testing.T) {
+	w := serve(func(c *gin.Context) { Success(c, "ok", nil) })
+
+	if !strings.Contains(w.Body.String(), `"metadata":null`) {
+		t.Errorf("Success with nil metadata must serialize as null, got: %s", w.Body.String())
+	}
+}
+
+func TestCreated_SerializesNullMetadata(t *testing.T) {
+	w := serve(func(c *gin.Context) { Created(c, "created", nil) })
+
+	if !strings.Contains(w.Body.String(), `"metadata":null`) {
+		t.Errorf("Created with nil metadata must serialize as null, got: %s", w.Body.String())
+	}
+}

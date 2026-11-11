@@ -92,6 +92,12 @@ func TestRequestLogger_LogsRequestMetadata(t *testing.T) {
 	if latency, ok := entry["latency_ms"].(float64); !ok || latency < 0 {
 		t.Errorf("expected non-negative latency_ms, got %v", entry["latency_ms"])
 	}
+	if bytes, ok := entry["response_bytes"].(float64); !ok || bytes < 0 {
+		t.Errorf("expected non-negative response_bytes, got %v", entry["response_bytes"])
+	}
+	if _, ok := entry["request_bytes"]; !ok {
+		t.Error("expected request_bytes attribute to be present in log entry")
+	}
 	if _, ok := entry["errors"]; ok {
 		t.Errorf("did not expect errors attribute, got %v", entry["errors"])
 	}
@@ -170,5 +176,16 @@ func TestRequestLogger_UnsetStatusDefaultsTo200(t *testing.T) {
 	}
 	if entries[0]["status"] != float64(http.StatusOK) {
 		t.Errorf("expected status 200, got %v", entries[0]["status"])
+	}
+}
+
+// TestRequestLogger_ExportedFactoryIsCallable verifies the public RequestLogger()
+// factory returns a non-nil handler and does not panic. All tests above exercise
+// only the unexported requestLogger(log) injection path; this test ensures the
+// exported wrapper is wired correctly.
+func TestRequestLogger_ExportedFactoryIsCallable(t *testing.T) {
+	handler := RequestLogger()
+	if handler == nil {
+		t.Fatal("RequestLogger() returned nil handler")
 	}
 }

@@ -104,10 +104,23 @@ func RateLimiter(config RateLimiterConfig) gin.HandlerFunc {
 			return
 		}
 
-		allowed := res[0].(int64)
-		remaining := res[1].(int64)
-		reset := res[2].(int64)
-		retryAfter := res[3].(int64)
+		log := logger.Get()
+		if len(res) < 4 {
+			log.Error("rate limiter: unexpected response length from redis script")
+			c.Next()
+			return
+		}
+
+		allowed, ok0 := res[0].(int64)
+		remaining, ok1 := res[1].(int64)
+		reset, ok2 := res[2].(int64)
+		retryAfter, ok3 := res[3].(int64)
+
+		if !ok0 || !ok1 || !ok2 || !ok3 {
+			log.Error("rate limiter: unexpected response types from redis script")
+			c.Next()
+			return
+		}
 
 		c.Header("X-RateLimit-Limit", strconv.Itoa(config.Limit))
 		c.Header("X-RateLimit-Remaining", strconv.FormatInt(remaining, 10))

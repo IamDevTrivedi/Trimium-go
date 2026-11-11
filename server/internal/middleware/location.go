@@ -52,6 +52,10 @@ func RequestGeo(g *GeoResolver) gin.HandlerFunc {
 }
 
 func (g *GeoResolver) lookup(rawIP string) *GeoInfo {
+	if g == nil || g.db == nil {
+		return &GeoInfo{}
+	}
+
 	ip := net.ParseIP(rawIP)
 	if ip == nil {
 		return &GeoInfo{}

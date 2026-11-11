@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/alicebob/miniredis/v2"
@@ -14,6 +15,17 @@ import (
 )
 
 var _ Queue = (*asynqQueue)(nil)
+
+func TestNew_ReturnsNonNilQueue(t *testing.T) {
+	mr := miniredis.RunT(t)
+
+	client := asynq.NewClient(asynq.RedisClientOpt{Addr: mr.Addr()})
+	defer client.Close()
+
+	if q := New(client); q == nil {
+		t.Fatal("New() returned nil Queue")
+	}
+}
 
 func TestQueue_SendEmail_EnqueuesEmailTask(t *testing.T) {
 	mr := miniredis.RunT(t)
@@ -74,5 +86,8 @@ func TestQueue_SendEmail_FailsOnClosedClient(t *testing.T) {
 	}
 	if errors.Is(err, context.Canceled) {
 		t.Errorf("expected an enqueue error, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "queue: enqueue email task:") {
+		t.Errorf("expected error to contain %q, got: %v", "queue: enqueue email task:", err)
 	}
 }

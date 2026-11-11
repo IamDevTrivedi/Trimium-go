@@ -433,6 +433,7 @@ func TestRateLimiter_PanicsOnInvalidConfig(t *testing.T) {
 		{"nil client", func(c *RateLimiterConfig) { c.Client = nil }, "Redis client"},
 		{"zero limit", func(c *RateLimiterConfig) { c.Limit = 0 }, "limit must be greater than zero"},
 		{"zero window", func(c *RateLimiterConfig) { c.Window = 0 }, "window must be at least one millisecond"},
+		{"sub-millisecond window", func(c *RateLimiterConfig) { c.Window = 999 * time.Microsecond }, "window must be at least one millisecond"},
 		{"nil keygen", func(c *RateLimiterConfig) { c.KeyGen = nil }, "requires a KeyGen"},
 	}
 
@@ -457,6 +458,26 @@ func TestRateLimiter_PanicsOnInvalidConfig(t *testing.T) {
 			}()
 
 			RateLimiter(config)
+		})
+	}
+}
+
+// TestRateLimitRedisKey verifies the internal key-formatting function so that
+// any change to the prefix or separator is caught immediately.
+func TestRateLimitRedisKey(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"my-key", "rl:my-key"},
+		{"user:123", "rl:user:123"},
+		{"", "rl:"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			if got := rateLimitRedisKey(tt.input); got != tt.want {
+				t.Errorf("rateLimitRedisKey(%q) = %q, want %q", tt.input, got, tt.want)
+			}
 		})
 	}
 }

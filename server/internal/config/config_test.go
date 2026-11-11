@@ -327,6 +327,8 @@ func TestLoad_ValidationErrors(t *testing.T) {
 		{name: "redis read timeout zero", key: "REDIS_READ_TIMEOUT", value: "0s", wantSub: []string{"RedisReadTimeout", "gt"}},
 		{name: "redis write timeout zero", key: "REDIS_WRITE_TIMEOUT", value: "0s", wantSub: []string{"RedisWriteTimeout", "gt"}},
 		{name: "redis ping timeout zero", key: "REDIS_PING_TIMEOUT", value: "0s", wantSub: []string{"RedisPingTimeout", "gt"}},
+		// REDIS_DB upper-bound: validate:"min=0,max=15" — 16 must be rejected.
+		{name: "redis db too high", key: "REDIS_DB", value: "16", wantSub: []string{"RedisDB", "max"}},
 	}
 
 	for _, tt := range tests {

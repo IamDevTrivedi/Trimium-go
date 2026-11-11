@@ -36,6 +36,11 @@ func TestNewRedis_Validation(t *testing.T) {
 			wantErr: "redis: host is required",
 		},
 		{
+			name:    "negative port",
+			mutate:  func(o *RedisOptions) { o.Port = -1 },
+			wantErr: "redis: invalid port -1",
+		},
+		{
 			name:    "invalid port zero",
 			mutate:  func(o *RedisOptions) { o.Port = 0 },
 			wantErr: "redis: invalid port 0",
