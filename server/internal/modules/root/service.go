@@ -24,6 +24,12 @@ type service struct {
 	queue queue.Queue
 }
 
+type AppInfo struct {
+	Name    string `json:"name"`
+	Version string `json:"version"`
+	Status  string `json:"status"`
+}
+
 func NewService(repo Repository, queue queue.Queue) Service {
 	return &service{
 		repo:  repo,
@@ -39,10 +45,6 @@ func (s *service) GetAppInfo(_ context.Context) (*AppInfo, error) {
 	}, nil
 }
 
-// SendWelcomeEmail hands the welcome-email payload to the queue. The
-// service neither knows nor cares whether delivery is asynchronous,
-// who consumes the payload, or how the queuing is done: a nil error
-// means the email is expected to be delivered.
 func (s *service) SendWelcomeEmail(ctx context.Context, to []string) error {
 	if len(to) == 0 {
 		return errors.New("root: welcome email requires at least one recipient")
