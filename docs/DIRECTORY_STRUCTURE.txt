@@ -65,13 +65,6 @@
 │       │   ├── useragent.go
 │       │   └── useragent_test.go
 │       ├── modules
-│       │   ├── auth
-│       │   │   ├── handler.go
-│       │   │   ├── module.go
-│       │   │   ├── ratelimiter.go
-│       │   │   ├── repository.go
-│       │   │   ├── route.go
-│       │   │   └── service.go
 │       │   ├── health
 │       │   │   ├── handler.go
 │       │   │   ├── handler_test.go
@@ -109,4 +102,4 @@
 │           └── email.go
 └── skills-lock.json
 
-29 directories, 81 files
+28 directories, 75 files
