@@ -16,10 +16,9 @@ import (
 type Config struct {
 	AppEnv              string        `env:"APP_ENV,required,notEmpty" validate:"oneof=production development"`
 	Port                int           `env:"PORT,required,notEmpty"              validate:"min=1,max=65535"`
-	BackendURLDev       string        `env:"BACKEND_URL_DEV,required,notEmpty"   validate:"http_url"`
-	FrontendURLDev      string        `env:"FRONTEND_URL_DEV,required,notEmpty"  validate:"http_url"`
-	BackendURLProd      string        `env:"BACKEND_URL_PROD,required,notEmpty"  validate:"http_url"`
-	FrontendURLProd     string        `env:"FRONTEND_URL_PROD,required,notEmpty" validate:"http_url"`
+	FrontendAppURL      string        `env:"FRONTEND_APP_URL,required,notEmpty"  validate:"http_url"`
+	FrontendLanderURL   string        `env:"FRONTEND_LANDER_URL,required,notEmpty" validate:"http_url"`
+	BackendURL          string        `env:"BACKEND_URL,required,notEmpty"       validate:"http_url"`
 	SMTPHost            string        `env:"SMTP_HOST,required,notEmpty"     validate:"hostname|ip"`
 	SMTPPort            int           `env:"SMTP_PORT,required,notEmpty"     validate:"min=1,max=65535"`
 	SMTPUsername        string        `env:"SMTP_USERNAME,required"`

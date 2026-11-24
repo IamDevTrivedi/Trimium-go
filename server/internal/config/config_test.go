@@ -20,10 +20,9 @@ func validEnvValues(geoIPPath string) map[string]string {
 	return map[string]string{
 		"APP_ENV":               "development",
 		"PORT":                  "8080",
-		"BACKEND_URL_DEV":       "http://localhost:8080",
-		"FRONTEND_URL_DEV":      "http://localhost:3000",
-		"BACKEND_URL_PROD":      "https://api.example.com",
-		"FRONTEND_URL_PROD":     "https://example.com",
+		"BACKEND_URL":           "http://localhost:8080",
+		"FRONTEND_LANDER_URL":   "http://localhost:3000",
+		"FRONTEND_APP_URL":      "http://localhost:3001",
 		"SMTP_HOST":             "127.0.0.1",
 		"SMTP_PORT":             "587",
 		"SMTP_USERNAME":         "smtp-user",
@@ -115,6 +114,15 @@ func TestLoad_DevelopmentSuccess(t *testing.T) {
 	}
 	if cfg.Port != 8080 {
 		t.Errorf("Port = %d, want %d", cfg.Port, 8080)
+	}
+	if cfg.BackendURL != "http://localhost:8080" {
+		t.Errorf("BackendURL = %q, want %q", cfg.BackendURL, "http://localhost:8080")
+	}
+	if cfg.FrontendLanderURL != "http://localhost:3000" {
+		t.Errorf("FrontendLanderURL = %q, want %q", cfg.FrontendLanderURL, "http://localhost:3000")
+	}
+	if cfg.FrontendAppURL != "http://localhost:3001" {
+		t.Errorf("FrontendAppURL = %q, want %q", cfg.FrontendAppURL, "http://localhost:3001")
 	}
 	if cfg.GeoIPDBPath != geoIPPath {
 		t.Errorf("GeoIPDBPath = %q, want %q", cfg.GeoIPDBPath, geoIPPath)
@@ -305,9 +313,9 @@ func TestLoad_ValidationErrors(t *testing.T) {
 	}{
 		{name: "port too low", key: "PORT", value: "0", wantSub: []string{"Port", "min"}},
 		{name: "port too high", key: "PORT", value: "65536", wantSub: []string{"Port", "max"}},
-		{name: "invalid dev backend url", key: "BACKEND_URL_DEV", value: "not-a-url", wantSub: []string{"BackendURLDev", "http_url"}},
-		{name: "invalid dev frontend url", key: "FRONTEND_URL_DEV", value: "ftp://example.com", wantSub: []string{"FrontendURLDev", "http_url"}},
-		{name: "invalid prod backend url", key: "BACKEND_URL_PROD", value: "example.com", wantSub: []string{"BackendURLProd", "http_url"}},
+		{name: "invalid backend url", key: "BACKEND_URL", value: "not-a-url", wantSub: []string{"BackendURL", "http_url"}},
+		{name: "invalid frontend lander url", key: "FRONTEND_LANDER_URL", value: "ftp://example.com", wantSub: []string{"FrontendLanderURL", "http_url"}},
+		{name: "invalid frontend app url", key: "FRONTEND_APP_URL", value: "example.com", wantSub: []string{"FrontendAppURL", "http_url"}},
 		{name: "invalid smtp host", key: "SMTP_HOST", value: "not a host!", wantSub: []string{"SMTPHost"}},
 		{name: "smtp port too low", key: "SMTP_PORT", value: "0", wantSub: []string{"SMTPPort", "min"}},
 		{name: "invalid from email", key: "FROM_EMAIL", value: "not-an-email", wantSub: []string{"FromEmail", "email"}},
