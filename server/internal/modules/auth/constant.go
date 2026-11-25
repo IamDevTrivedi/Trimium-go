@@ -13,7 +13,7 @@ const resetPasswordOTPLength = 6
 const maxVerificationAttempts = 3
 
 const signUpOTPKeyPrefix = "auth:signup-otp:"
-const resetPasswordOTPKeyPrefix = "auth:reset-password-otp:"
+const resetPasswordOTPKeyPrefix = "auth:reset-password-otp:" //nolint:gosec
 
 const (
 	minNameLength     = 1
