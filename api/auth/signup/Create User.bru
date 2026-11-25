@@ -1,0 +1,92 @@
+meta {
+  name: Create User
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{appURL}}/api/v1/auth/signup/create
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "first_name": "John",
+    "last_name": "Doe",
+    "email": "john.doe@example.com",
+    "username": "john-doe.99",
+    "password": "SecurePass123!"
+  }
+}
+
+tests {
+  test("status is 201, 400, or 409", function() {
+    expect(res.status).to.be.oneOf([201, 400, 409]);
+  });
+  
+  test("response structure is valid", function() {
+    const body = res.body;
+    expect(body).to.be.an("object");
+    if (res.status === 201) {
+      expect(body.success).to.be.true;
+      expect(body.msg).to.equal("User account created successfully");
+    } else {
+      expect(body.success).to.be.false;
+      expect(body.msg).to.be.a("string");
+    }
+  });
+}
+
+docs {
+  # Complete User Registration (Create Account)
+  
+  Finalizes registration after email verification.
+  
+  - Validates all input constraints (names, username characters and length, password complexity).
+  - Checks Redis to confirm the email is marked as `VERIFIED`.
+  - Ensures neither email nor username already exists in MongoDB.
+  - Hashes the password using Argon2id with secure salt.
+  - Inserts the new user record into the MongoDB `users` collection.
+  
+  ## Request
+  - **Method:** `POST`
+  - **Endpoint:** `/api/v1/auth/signup/create`
+  - **Rate Limit:** 5 requests/minute per IP (Key: `auth:signup:create<ip>`)
+  
+  ## Field Requirements
+  | Field | Type | Rules |
+  |---|---|---|
+  | `first_name` | `string` | 1-50 characters. Letters, spaces, hyphens, apostrophes only. |
+  | `last_name` | `string` | 1-50 characters. Letters, spaces, hyphens, apostrophes only. |
+  | `email` | `string` | Lowercase, RFC compliant, no aliases. Must be pre-verified. |
+  | `username` | `string` | 3-30 characters. Allowed characters: `a-z`, `A-Z`, `0-9`, `-`, `.`. |
+  | `password` | `string` | 10-128 characters. Must contain lowercase, uppercase, digit, and special character. |
+  
+  ```json
+  {
+    "first_name": "John",
+    "last_name": "Doe",
+    "email": "john.doe@example.com",
+    "username": "john-doe.99",
+    "password": "SecurePass123!"
+  }
+  ```
+  
+  ## Responses
+  - **201 Created:** Account successfully created.
+    ```json
+    {
+      "success": true,
+      "msg": "User account created successfully",
+      "metadata": null,
+      "timestamp": 1732550000000
+    }
+    ```
+  - **400 Bad Request:** Email unverified/expired or validation failure.
+  - **409 Conflict:** Email or username already registered.
+}

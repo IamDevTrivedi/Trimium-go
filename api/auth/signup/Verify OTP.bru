@@ -1,0 +1,83 @@
+meta {
+  name: Verify Signup OTP
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{appURL}}/api/v1/auth/signup/verify
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "email": "john.doe@example.com",
+    "otp": "LMDIF0"
+  }
+}
+
+tests {
+  test("status is 200 or 400", function() {
+    expect(res.status).to.be.oneOf([200, 400]);
+  });
+  
+  test("response structure is valid", function() {
+    const body = res.body;
+    expect(body).to.be.an("object");
+    if (res.status === 200) {
+      expect(body.success).to.be.true;
+      expect(body.msg).to.equal("Email verified successfully");
+    } else {
+      expect(body.success).to.be.false;
+      expect(body.msg).to.be.oneOf([
+        "Verification code not found or expired",
+        "Invalid verification code",
+        "Maximum verification attempts exceeded"
+      ]);
+    }
+  });
+}
+
+docs {
+  # Verify Signup OTP
+  
+  Verifies the 6-digit OTP sent to the user's email during signup initiation. Constant-time comparison is used to mitigate timing attacks.
+  
+  - If the OTP matches, the Redis state is updated to `VERIFIED` with a 15-minute TTL allowing account creation.
+  - If the OTP fails, an attempt counter is incremented. After 3 failed attempts, the OTP record is purged from Redis.
+  
+  ## Request
+  - **Method:** `POST`
+  - **Endpoint:** `/api/v1/auth/signup/verify`
+  - **Rate Limit:** 10 requests/minute per IP (Key: `auth:signup:verify:<ip>`)
+  
+  ## Request Body
+  | Field | Type | Required | Description |
+  |---|---|---|---|
+  | `email` | `string` | Yes | Target user email address (must match init email). |
+  | `otp` | `string` | Yes | 6-digit numerical verification code. |
+  
+  ```json
+  {
+    "email": "john.doe@example.com",
+    "otp": "123456"
+  }
+  ```
+  
+  ## Responses
+  - **200 OK:** OTP is verified.
+    ```json
+    {
+      "success": true,
+      "msg": "Email verified successfully",
+      "metadata": null,
+      "timestamp": 1732550000000
+    }
+    ```
+  - **400 Bad Request:** Expired, incorrect OTP, or maximum attempts exceeded.
+}

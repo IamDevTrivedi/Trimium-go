@@ -1,0 +1,48 @@
+meta {
+  name: App Health
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{appURL}}/api/v1/healthz
+  body: none
+  auth: none
+}
+
+tests {
+  test("status is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("response indicates app is healthy", function() {
+    const body = res.body;
+    expect(body).to.be.an("object");
+    expect(body.success).to.be.true;
+    expect(body.msg).to.equal("App is working");
+  });
+}
+
+docs {
+  # Application Overall Health Check
+  
+  Validates overall application readiness, ensuring internal services and processes are responsive.
+  
+  ## Request
+  - **Method:** `GET`
+  - **Endpoint:** `/api/v1/healthz`
+  - **Authentication:** None
+  - **Rate Limit:** 50 requests/minute per IP (Key: `health:index:<ip>`)
+  
+  ## Response (200 OK)
+  ```json
+  {
+    "success": true,
+    "msg": "App is working",
+    "metadata": {
+      "status": "healthy"
+    },
+    "timestamp": 1732550000000
+  }
+  ```
+}

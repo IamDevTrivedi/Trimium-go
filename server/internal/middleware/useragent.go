@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"strings"
+
 	"github.com/gin-gonic/gin"
 	"github.com/mileusna/useragent"
 )
@@ -63,4 +65,43 @@ func GetRequestUA(c *gin.Context) *UserAgentInfo {
 		}
 	}
 	return &UserAgentInfo{}
+}
+
+func GetStringRequestUA(c *gin.Context) string {
+	ua := GetRequestUA(c)
+	if ua == nil {
+		return "Unknown Device"
+	}
+
+	if ua.IsBot {
+		if ua.Browser != "" {
+			return ua.Browser + " Bot"
+		}
+		return "Automated Bot"
+	}
+
+	browser := ua.Browser
+	os := ua.OS
+	device := ua.Device
+
+	switch {
+	case browser != "" && device != "" && os != "":
+		return browser + " on " + device + " (" + os + ")"
+	case browser != "" && os != "":
+		return browser + " on " + os
+	case browser != "" && device != "":
+		return browser + " on " + device
+	case browser != "":
+		return browser
+	case device != "" && os != "":
+		return device + " (" + os + ")"
+	case os != "":
+		return os
+	case device != "":
+		return device
+	case strings.TrimSpace(ua.Raw) != "":
+		return strings.TrimSpace(ua.Raw)
+	default:
+		return "Unknown Device"
+	}
 }

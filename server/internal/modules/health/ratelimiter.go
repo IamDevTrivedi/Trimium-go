@@ -10,9 +10,9 @@ import (
 )
 
 const (
-	indexRatePerMinute = 5
-	redisRatePerMinute = 10
-	mongoRatePerMinute = 15
+	indexRatePerMinute = 50
+	redisRatePerMinute = 50
+	mongoRatePerMinute = 50
 )
 
 func NewRateLimiters(store *database.Redis) (indexRL, redisRL, mongoRL gin.HandlerFunc) {

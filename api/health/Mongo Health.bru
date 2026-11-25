@@ -1,0 +1,61 @@
+meta {
+  name: Mongo Health
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{appURL}}/api/v1/healthz/mongo
+  body: none
+  auth: none
+}
+
+tests {
+  test("status is 200 or 503", function() {
+    expect(res.status).to.be.oneOf([200, 503]);
+  });
+
+  test("response payload matches status", function() {
+    const body = res.body;
+    expect(body).to.be.an("object");
+    if (res.status === 200) {
+      expect(body.success).to.be.true;
+      expect(body.msg).to.equal("Mongo is working");
+    } else {
+      expect(body.success).to.be.false;
+      expect(body.msg).to.equal("Mongo is not working");
+    }
+  });
+}
+
+docs {
+  # MongoDB Connection Health Check
+  
+  Checks the API server's connection and admin ping against the primary MongoDB cluster.
+  
+  ## Request
+  - **Method:** `GET`
+  - **Endpoint:** `/api/v1/healthz/mongo`
+  - **Authentication:** None
+  - **Rate Limit:** 50 requests/minute per IP (Key: `health:mongo:<ip>`)
+  
+  ## Responses
+  - **200 OK:** MongoDB is connected and responsive.
+    ```json
+    {
+      "success": true,
+      "msg": "Mongo is working",
+      "metadata": { "ping": "ok" },
+      "timestamp": 1732550000000
+    }
+    ```
+  - **503 Service Unavailable:** MongoDB is unreachable or unresponsive.
+    ```json
+    {
+      "success": false,
+      "msg": "Mongo is not working",
+      "metadata": null,
+      "timestamp": 1732550000000
+    }
+    ```
+}

@@ -1,0 +1,31 @@
+meta {
+  name: RedisInsight
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{redisInsightURL}}/health
+  body: none
+  auth: none
+}
+
+tests {
+  test("status is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+}
+
+docs {
+  # RedisInsight Health Check
+  
+  Direct HTTP health check for the RedisInsight GUI container.
+  
+  ## Request
+  - **Method:** `GET`
+  - **Endpoint:** `{{redisInsightURL}}/health`
+  - **Rate Limit:** None (Direct container service)
+  
+  ## Response (200 OK)
+  Returns HTTP 200 indicating the RedisInsight server is active.
+}

@@ -1,0 +1,17 @@
+package auth
+
+import (
+	"github.com/gin-gonic/gin"
+
+	"server/internal/database"
+	"server/internal/queue"
+)
+
+func Register(router gin.IRouter, redis *database.Redis, mongo *database.Mongo, queue queue.Queue) {
+	repo := NewRepository(redis, mongo)
+	svc := NewService(repo, queue)
+	h := NewHandler(svc)
+	signUpInitRL, signUpVerifyRL, createUserRL, resetPasswordInitRL, resetPasswordVerifyRL, resetPasswordRL := NewRateLimiters(redis)
+
+	RegisterRoutes(router, signUpInitRL, signUpVerifyRL, createUserRL, resetPasswordInitRL, resetPasswordVerifyRL, resetPasswordRL, h)
+}

@@ -1,0 +1,83 @@
+meta {
+  name: Verify Reset Password OTP
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{appURL}}/api/v1/auth/reset-password/verify
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "email": "john.doe@example.com",
+    "otp": "123456"
+  }
+}
+
+tests {
+  test("status is 200 or 400", function() {
+    expect(res.status).to.be.oneOf([200, 400]);
+  });
+
+  test("response structure is valid", function() {
+    const body = res.body;
+    expect(body).to.be.an("object");
+    if (res.status === 200) {
+      expect(body.success).to.be.true;
+      expect(body.msg).to.equal("Email verified successfully");
+    } else {
+      expect(body.success).to.be.false;
+      expect(body.msg).to.be.oneOf([
+        "Verification code not found or expired",
+        "Invalid verification code",
+        "Maximum verification attempts exceeded"
+      ]);
+    }
+  });
+}
+
+docs {
+  # Verify Password Reset OTP
+  
+  Validates the OTP code received by the user for password recovery. Uses constant-time equality check to prevent timing analysis.
+  
+  - If valid: marks the Redis state as `VERIFIED` with a 15-minute TTL.
+  - If invalid: increments attempt counter (purged after 3 failed attempts).
+  
+  ## Request
+  - **Method:** `POST`
+  - **Endpoint:** `/api/v1/auth/reset-password/verify`
+  - **Rate Limit:** 10 requests/minute per IP (Key: `auth:reset-password:verify:<ip>`)
+  
+  ## Request Body
+  | Field | Type | Required | Description |
+  |---|---|---|---|
+  | `email` | `string` | Yes | Registered account email address. |
+  | `otp` | `string` | Yes | 6-digit numerical code. |
+  
+  ```json
+  {
+    "email": "john.doe@example.com",
+    "otp": "123456"
+  }
+  ```
+  
+  ## Responses
+  - **200 OK:** OTP verified successfully.
+    ```json
+    {
+      "success": true,
+      "msg": "Email verified successfully",
+      "metadata": null,
+      "timestamp": 1732550000000
+    }
+    ```
+  - **400 Bad Request:** Expired, incorrect OTP, or maximum attempts exceeded.
+}

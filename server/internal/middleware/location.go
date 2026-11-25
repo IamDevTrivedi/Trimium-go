@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"net"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/oschwald/geoip2-golang"
@@ -93,4 +94,30 @@ func GetRequestGeo(c *gin.Context) *GeoInfo {
 		}
 	}
 	return &GeoInfo{}
+}
+
+func GetStringRequestLocation(c *gin.Context) string {
+	geo := GetRequestGeo(c)
+	if geo == nil {
+		return "Unknown Location"
+	}
+
+	var parts []string
+	if geo.City != "" {
+		parts = append(parts, geo.City)
+	}
+	if geo.Region != "" && geo.Region != geo.City {
+		parts = append(parts, geo.Region)
+	}
+	if geo.CountryName != "" {
+		parts = append(parts, geo.CountryName)
+	} else if geo.Country != "" {
+		parts = append(parts, geo.Country)
+	}
+
+	if len(parts) == 0 {
+		return "Unknown Location"
+	}
+
+	return strings.Join(parts, ", ")
 }

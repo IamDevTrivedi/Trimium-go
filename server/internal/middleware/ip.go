@@ -29,3 +29,11 @@ func resolveIP(raw string) string {
 func GetRequestIP(c *gin.Context) string {
 	return c.GetString(ReqIPKey)
 }
+
+func GetStringRequestIP(c *gin.Context) string {
+	ip := GetRequestIP(c)
+	if ip == "" {
+		return "Unknown"
+	}
+	return ip
+}

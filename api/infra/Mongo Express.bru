@@ -1,0 +1,31 @@
+meta {
+  name: Mongo Express
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{mongoExpressURL}}
+  body: none
+  auth: none
+}
+
+tests {
+  test("status is 200 or 401", function() {
+    expect([200, 401]).to.include(res.status);
+  });
+}
+
+docs {
+  # Mongo Express Health Check
+  
+  Direct HTTP health check for the Mongo Express administrative GUI container.
+  
+  ## Request
+  - **Method:** `GET`
+  - **Endpoint:** `{{mongoExpressURL}}`
+  - **Rate Limit:** None (Direct container service)
+  
+  ## Response
+  Returns 200 OK or 401 Unauthorized (when basic auth is active).
+}

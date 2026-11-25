@@ -1,0 +1,31 @@
+meta {
+  name: Mailpit Web
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{mailpitURL}}/readyz
+  body: none
+  auth: none
+}
+
+tests {
+  test("status is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+}
+
+docs {
+  # Mailpit Health Check
+  
+  Direct readiness check for the local Mailpit SMTP/Webmail testing container.
+  
+  ## Request
+  - **Method:** `GET`
+  - **Endpoint:** `{{mailpitURL}}/readyz`
+  - **Rate Limit:** None (Direct container service)
+  
+  ## Response (200 OK)
+  Mailpit returns HTTP 200 indicating the web server and database are ready.
+}

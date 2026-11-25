@@ -1,40 +1,19 @@
 package middleware
 
 import (
-	"crypto/rand"
-	"encoding/hex"
-	"fmt"
-	"time"
-
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
+
+	"server/internal/crypto"
 )
 
 const ReqIDKey = "reqID"
 
 func RequestID() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.Set(ReqIDKey, newRequestID())
+		id, _ := crypto.NewUUID()
+		c.Set(ReqIDKey, id)
 		c.Next()
 	}
-}
-
-func newRequestID() string {
-	if id, err := uuid.NewV7(); err == nil {
-		return id.String()
-	}
-	return fallbackID()
-}
-
-// fallbackID: fallback-<epoch ms>-<8 hex chars>
-func fallbackID() string {
-	now := time.Now()
-	b := make([]byte, 4)
-	if _, err := rand.Read(b); err != nil {
-		// crypto/rand failed too; use nanosecond time as the entropy source
-		return fmt.Sprintf("fallback-%d-%08x", now.UnixMilli(), now.UnixNano()&0xffffffff)
-	}
-	return fmt.Sprintf("fallback-%d-%s", now.UnixMilli(), hex.EncodeToString(b))
 }
 
 func GetRequestID(c *gin.Context) string {

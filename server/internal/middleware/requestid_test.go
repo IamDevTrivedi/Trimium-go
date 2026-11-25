@@ -3,16 +3,11 @@ package middleware
 import (
 	"net/http"
 	"net/http/httptest"
-	"regexp"
-	"strconv"
 	"testing"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
-
-var fallbackIDPattern = regexp.MustCompile(`^fallback-(\d+)-[0-9a-f]{8}$`)
 
 func TestRequestID_SetsUUIDv7InContext(t *testing.T) {
 	var handlerID string
@@ -76,44 +71,6 @@ func TestRequestID_UniquePerRequest(t *testing.T) {
 			t.Fatalf("request %d reused request ID %q", i, id)
 		}
 		seen[id] = struct{}{}
-	}
-}
-
-func TestNewRequestID_ReturnsUUIDv7(t *testing.T) {
-	for i := range 50 {
-		id := newRequestID()
-
-		parsed, err := uuid.Parse(id)
-		if err != nil {
-			t.Fatalf("newRequestID() returned %q, which is not a valid UUID: %v", id, err)
-		}
-		if got := parsed.Version(); got != 7 {
-			t.Errorf("iteration %d: expected UUID version 7, got %d", i, got)
-		}
-	}
-}
-
-func TestFallbackID_FormatAndUniqueness(t *testing.T) {
-	before := time.Now().UnixMilli()
-	first := fallbackID()
-	after := time.Now().UnixMilli()
-
-	matches := fallbackIDPattern.FindStringSubmatch(first)
-	if matches == nil {
-		t.Fatalf("fallbackID() = %q, want format fallback-<epoch ms>-<8 hex chars>", first)
-	}
-
-	timestamp, err := strconv.ParseInt(matches[1], 10, 64)
-	if err != nil {
-		t.Fatalf("failed to parse fallback timestamp %q: %v", matches[1], err)
-	}
-	if timestamp < before || timestamp > after {
-		t.Errorf("fallback timestamp %d is outside [%d, %d]", timestamp, before, after)
-	}
-
-	second := fallbackID()
-	if first == second {
-		t.Errorf("fallbackID() returned the same ID twice: %q", first)
 	}
 }
 

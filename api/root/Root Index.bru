@@ -1,0 +1,52 @@
+meta {
+  name: Root Index
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{appURL}}/api/v1
+  body: none
+  auth: none
+}
+
+tests {
+  test("status is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("response structure and message are valid", function() {
+    const body = res.body;
+    expect(body).to.be.an("object");
+    expect(body.success).to.be.true;
+    expect(body.msg).to.equal("Welcome to Trimium API");
+    expect(body.metadata).to.be.an("object");
+  });
+}
+
+docs {
+  # Root API Endpoint
+  
+  Returns application metadata, version information, and basic server info for Trimium API.
+  
+  ## Request
+  - **Method:** `GET`
+  - **Endpoint:** `/api/v1`
+  - **Authentication:** None
+  - **Rate Limit:** 50 requests/minute per IP (Key: `root:index:<ip>`)
+  
+  ## Response (200 OK)
+  ```json
+  {
+    "success": true,
+    "msg": "Welcome to Trimium API",
+    "metadata": {
+      "version": "1.0.0",
+      "commit": "...",
+      "build_time": "...",
+      "uptime_seconds": 120
+    },
+    "timestamp": 1732550000000
+  }
+  ```
+}

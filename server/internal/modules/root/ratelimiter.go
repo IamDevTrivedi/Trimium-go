@@ -10,8 +10,7 @@ import (
 )
 
 const (
-	rateLimitPerMinute    = 50
-	welcomeEmailPerMinute = 5
+	rateLimitPerMinute = 50
 )
 
 func NewRateLimiters(store *database.Redis) (indexRL gin.HandlerFunc) {

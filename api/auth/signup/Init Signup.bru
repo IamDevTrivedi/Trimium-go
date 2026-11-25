@@ -1,0 +1,82 @@
+meta {
+  name: Init Signup
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{appURL}}/api/v1/auth/signup/init
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "email": "john.doe@example.com"
+  }
+}
+
+tests {
+  test("status is 200 or 409", function() {
+    expect(res.status).to.be.oneOf([200, 409]);
+  });
+  
+  test("response structure is valid", function() {
+    const body = res.body;
+    expect(body).to.be.an("object");
+    if (res.status === 200) {
+      expect(body.success).to.be.true;
+      expect(body.msg).to.equal("Verification code sent successfully");
+    } else if (res.status === 409) {
+      expect(body.success).to.be.false;
+      expect(body.msg).to.equal("Email is already registered");
+    }
+  });
+}
+
+docs {
+  # Initiate User Signup
+  
+  Starts the user registration flow. Validates the email address, verifies it is not already registered in MongoDB, generates a 6-digit OTP, stores it in Redis with a 5-minute TTL, and enqueues an email containing request context (client IP, location, device) to the user via Mailpit/SMTP.
+  
+  ## Request
+  - **Method:** `POST`
+  - **Endpoint:** `/api/v1/auth/signup/init`
+  - **Rate Limit:** 5 requests/minute per IP (Key: `auth:signup:init:<ip>`)
+  
+  ## Request Body
+  | Field | Type | Required | Description |
+  |---|---|---|---|
+  | `email` | `string` | Yes | Valid email address. Must be lowercase, standard RFC format. Aliases (`+`) are not allowed. |
+  
+  ```json
+  {
+    "email": "john.doe@example.com"
+  }
+  ```
+  
+  ## Responses
+  - **200 OK:** Verification OTP generated and dispatched.
+    ```json
+    {
+      "success": true,
+      "msg": "Verification code sent successfully",
+      "metadata": null,
+      "timestamp": 1732550000000
+    }
+    ```
+  - **409 Conflict:** Email is already registered.
+    ```json
+    {
+      "success": false,
+      "msg": "Email is already registered",
+      "metadata": null,
+      "timestamp": 1732550000000
+    }
+    ```
+  - **400 Bad Request:** Validation failure (e.g. uppercase letters, alias `+` symbol, malformed format).
+}
