@@ -6,7 +6,39 @@
 │       └── server-ci.yml
 ├── .gitignore
 ├── README.md
-├── client
+├── api
+│   ├── auth
+│   │   ├── folder.bru
+│   │   ├── reset-password
+│   │   │   ├── Init Reset Password.bru
+│   │   │   ├── Reset Password.bru
+│   │   │   ├── Verify OTP.bru
+│   │   │   └── folder.bru
+│   │   └── signup
+│   │       ├── Create User.bru
+│   │       ├── Init Signup.bru
+│   │       ├── Verify OTP.bru
+│   │       └── folder.bru
+│   ├── bruno.json
+│   ├── environments
+│   │   ├── Local.bru
+│   │   └── Production.bru
+│   ├── health
+│   │   ├── App Health.bru
+│   │   ├── Mongo Health.bru
+│   │   ├── Redis Health.bru
+│   │   └── folder.bru
+│   ├── infra
+│   │   ├── Mailpit Web.bru
+│   │   ├── Mongo Express.bru
+│   │   ├── RedisInsight.bru
+│   │   └── folder.bru
+│   └── root
+│       ├── Root Index.bru
+│       └── folder.bru
+├── client_app
+│   └── .gitkeep
+├── client_lander
 │   └── .gitkeep
 ├── docs
 │   ├── .gitkeep
@@ -37,14 +69,16 @@
 │       │   └── config_test.go
 │       ├── crypto
 │       │   ├── argon2.go
-│       │   └── otp.go
+│       │   ├── otp.go
+│       │   └── uuid.go
 │       ├── database
 │       │   ├── mongo.go
 │       │   ├── mongo_test.go
 │       │   ├── redis.go
 │       │   └── redis_test.go
 │       ├── emailtemplates
-│       │   └── signup.go
+│       │   ├── reset-password-otp.go
+│       │   └── signup-otp.go
 │       ├── logger
 │       │   ├── logger.go
 │       │   └── logger_test.go
@@ -65,6 +99,14 @@
 │       │   ├── useragent.go
 │       │   └── useragent_test.go
 │       ├── modules
+│       │   ├── auth
+│       │   │   ├── constant.go
+│       │   │   ├── handler.go
+│       │   │   ├── module.go
+│       │   │   ├── ratelimiter.go
+│       │   │   ├── repository.go
+│       │   │   ├── route.go
+│       │   │   └── service.go
 │       │   ├── health
 │       │   │   ├── handler.go
 │       │   │   ├── handler_test.go
@@ -102,4 +144,4 @@
 │           └── email.go
 └── skills-lock.json
 
-28 directories, 75 files
+38 directories, 107 files
